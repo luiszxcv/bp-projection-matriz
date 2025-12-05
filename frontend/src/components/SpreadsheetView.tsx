@@ -330,16 +330,21 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
     }
     addRow('$ Total Receita Renovação', monthlyData.map(m => m.totalRenewalRevenue));
 
-    // EXPANSIONS
+    // EXPANSIONS - BASE ATIVA (conversões Saber→Executar)
     data.push(['', '', '', '', '', '', '', '', '', '', '', '', '', '']);
-    data.push(['EXPANSÕES', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    data.push(['EXPANSÕES BASE ATIVA', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    addRow('% Taxa Expansão Base Ativa', Array(12).fill(inputs.conversionRates.expansionRate));
     for (const tier of TIERS) {
       for (const product of PRODUCTS) {
-        addRow(`  # Expansão ${PRODUCT_LABELS[product]} ${TIER_LABELS[tier]}`, monthlyData.map(m => m.expansions[tier][product]));
-        addRow(`  $ Receita Expansão ${PRODUCT_LABELS[product]} ${TIER_LABELS[tier]}`, monthlyData.map(m => m.expansionRevenue[tier][product]));
+        addRow(`  # Expansão ${PRODUCT_LABELS[product]} ${TIER_LABELS[tier]}`, monthlyData.map(m => m.activeBaseExpansions[tier][product]));
+        addRow(`  $ Receita Expansão ${PRODUCT_LABELS[product]} ${TIER_LABELS[tier]}`, monthlyData.map(m => m.activeBaseExpansionRevenue[tier][product]));
       }
     }
-    addRow('$ Total Receita Expansão', monthlyData.map(m => m.totalExpansionRevenue));
+    addRow('$ Total Receita Expansão Base Ativa', monthlyData.map(m => 
+      TIERS.reduce((sum, tier) => 
+        sum + PRODUCTS.reduce((pSum, product) => 
+          pSum + m.activeBaseExpansionRevenue[tier][product], 0), 0)
+    ));
 
     // LEGACY BASE
     data.push(['', '', '', '', '', '', '', '', '', '', '', '', '', '']);
