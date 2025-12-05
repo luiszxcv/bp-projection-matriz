@@ -67,6 +67,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
     funnel: true,
     conversionRates: false,
     renewals: false,
+    activeBaseExpansions: true,
     expansions: false,
     legacyBase: false,
     totals: true,
@@ -330,20 +331,29 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
     }
     addRow('$ Total Receita Renovação', monthlyData.map(m => m.totalRenewalRevenue));
 
-    // EXPANSIONS - BASE ATIVA (conversões Saber→Executar)
+    // CONVERSÕES SABER → EXECUTAR
     data.push(['', '', '', '', '', '', '', '', '', '', '', '', '', '']);
-    data.push(['EXPANSÕES BASE ATIVA', '', '', '', '', '', '', '', '', '', '', '', '', '']);
-    addRow('% Taxa Expansão Base Ativa', Array(12).fill(inputs.conversionRates.expansionRate));
+    data.push(['CONVERSÕES SABER → EXECUTAR', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    
+    // Conversões Saber → Executar por tier
     for (const tier of TIERS) {
-      for (const product of PRODUCTS) {
-        addRow(`  # Expansão ${PRODUCT_LABELS[product]} ${TIER_LABELS[tier]}`, monthlyData.map(m => m.activeBaseExpansions[tier][product]));
-        addRow(`  $ Receita Expansão ${PRODUCT_LABELS[product]} ${TIER_LABELS[tier]}`, monthlyData.map(m => m.activeBaseExpansionRevenue[tier][product]));
-      }
+      addRow(`  # Clientes Saber > Executar ${TIER_LABELS[tier]}`, monthlyData.map(m => m.conversions[tier].loyalty + m.conversions[tier].noLoyalty));
+      const conversionRevenue = monthlyData.map(m => {
+        const metrics = inputs.tierMetrics[tier];
+        const monthIdx = m.month;
+        const loyaltyRev = m.conversions[tier].loyalty * metrics.productTickets.executarLoyalty[monthIdx] * inputs.conversionRates.loyaltyDuration;
+        const noLoyaltyRev = m.conversions[tier].noLoyalty * metrics.productTickets.executarNoLoyalty[monthIdx] * inputs.conversionRates.noLoyaltyDuration;
+        return loyaltyRev + noLoyaltyRev;
+      });
+      addRow(`  $ Receita Saber > Executar ${TIER_LABELS[tier]}`, conversionRevenue);
     }
-    addRow('$ Total Receita Expansão Base Ativa', monthlyData.map(m => 
-      TIERS.reduce((sum, tier) => 
-        sum + PRODUCTS.reduce((pSum, product) => 
-          pSum + m.activeBaseExpansionRevenue[tier][product], 0), 0)
+    addRow('$ Total Receita Conversões', monthlyData.map(m => 
+      TIERS.reduce((sum, tier) => {
+        const metrics = inputs.tierMetrics[tier];
+        const loyaltyRev = m.conversions[tier].loyalty * metrics.productTickets.executarLoyalty[m.month] * inputs.conversionRates.loyaltyDuration;
+        const noLoyaltyRev = m.conversions[tier].noLoyalty * metrics.productTickets.executarNoLoyalty[m.month] * inputs.conversionRates.noLoyaltyDuration;
+        return sum + loyaltyRev + noLoyaltyRev;
+      }, 0)
     ));
 
     // LEGACY BASE
@@ -1147,6 +1157,108 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
               ))}
             </React.Fragment>
           ))}
+
+          {/* CONVERSÕES SABER → EXECUTAR SECTION */}
+          <div className="flex">
+            <RowHeader 
+              label="CONVERSÕES SABER → EXECUTAR" 
+              level="section"
+              expanded={expandedSections.activeBaseExpansions}
+              onToggle={() => toggleSection('activeBaseExpansions')}
+            />
+            {[...Array(13)].map((_, i) => (
+              <div key={i} className="spreadsheet-cell bg-primary/10" />
+            ))}
+          </div>
+
+          {expandedSections.activeBaseExpansions && (
+            <>
+              {/* Conversões Saber → Executar por tier */}
+              {TIERS.map((tier) => (
+                <React.Fragment key={`saber-executar-${tier}`}>
+                  <div className="flex row-hover">
+                    <RowHeader 
+                      label={`# Clientes Saber > Executar ${TIER_LABELS[tier]}`} 
+                      tooltip="Clientes Saber que converteram para Executar"
+                      className="pl-4" 
+                    />
+                    {monthlyData.map((m, i) => (
+                      <SpreadsheetCell
+                        key={i}
+                        value={m.conversions[tier].loyalty + m.conversions[tier].noLoyalty}
+                        format="number"
+                      />
+                    ))}
+                    <SpreadsheetCell
+                      value={monthlyData.reduce((sum, m) => sum + m.conversions[tier].loyalty + m.conversions[tier].noLoyalty, 0)}
+                      format="number"
+                      className="bg-primary/10 font-semibold"
+                    />
+                  </div>
+                  <div className="flex row-hover">
+                    <RowHeader 
+                      label={`$ Receita Saber > Executar ${TIER_LABELS[tier]}`} 
+                      tooltip="Receita gerada pelas conversões Saber → Executar"
+                      className="pl-4" 
+                    />
+                    {monthlyData.map((m, i) => {
+                      const metrics = inputs.tierMetrics[tier];
+                      const loyaltyRev = m.conversions[tier].loyalty * metrics.productTickets.executarLoyalty[i] * inputs.conversionRates.loyaltyDuration;
+                      const noLoyaltyRev = m.conversions[tier].noLoyalty * metrics.productTickets.executarNoLoyalty[i] * inputs.conversionRates.noLoyaltyDuration;
+                      return (
+                        <SpreadsheetCell
+                          key={i}
+                          value={loyaltyRev + noLoyaltyRev}
+                          format="currency"
+                        />
+                      );
+                    })}
+                    <SpreadsheetCell
+                      value={monthlyData.reduce((sum, m) => {
+                        const metrics = inputs.tierMetrics[tier];
+                        const loyaltyRev = m.conversions[tier].loyalty * metrics.productTickets.executarLoyalty[m.month] * inputs.conversionRates.loyaltyDuration;
+                        const noLoyaltyRev = m.conversions[tier].noLoyalty * metrics.productTickets.executarNoLoyalty[m.month] * inputs.conversionRates.noLoyaltyDuration;
+                        return sum + loyaltyRev + noLoyaltyRev;
+                      }, 0)}
+                      format="currency"
+                      className="bg-primary/10 font-semibold"
+                    />
+                  </div>
+                </React.Fragment>
+              ))}
+
+              {/* Total Conversion Revenue */}
+              <div className="flex row-hover">
+                <RowHeader 
+                  label="$ Total Receita Conversões" 
+                  className="font-semibold"
+                />
+                {monthlyData.map((m, i) => (
+                  <SpreadsheetCell
+                    key={i}
+                    value={TIERS.reduce((sum, tier) => {
+                      const metrics = inputs.tierMetrics[tier];
+                      const loyaltyRev = m.conversions[tier].loyalty * metrics.productTickets.executarLoyalty[i] * inputs.conversionRates.loyaltyDuration;
+                      const noLoyaltyRev = m.conversions[tier].noLoyalty * metrics.productTickets.executarNoLoyalty[i] * inputs.conversionRates.noLoyaltyDuration;
+                      return sum + loyaltyRev + noLoyaltyRev;
+                    }, 0)}
+                    format="currency"
+                  />
+                ))}
+                <SpreadsheetCell
+                  value={monthlyData.reduce((sum, m) => 
+                    sum + TIERS.reduce((tSum, tier) => {
+                      const metrics = inputs.tierMetrics[tier];
+                      const loyaltyRev = m.conversions[tier].loyalty * metrics.productTickets.executarLoyalty[m.month] * inputs.conversionRates.loyaltyDuration;
+                      const noLoyaltyRev = m.conversions[tier].noLoyalty * metrics.productTickets.executarNoLoyalty[m.month] * inputs.conversionRates.noLoyaltyDuration;
+                      return tSum + loyaltyRev + noLoyaltyRev;
+                    }, 0), 0)}
+                  format="currency"
+                  className="bg-primary/10 font-semibold"
+                />
+              </div>
+            </>
+          )}
 
           {/* EXPANSIONS BY TIER/PRODUCT SECTION */}
           <div className="flex">
