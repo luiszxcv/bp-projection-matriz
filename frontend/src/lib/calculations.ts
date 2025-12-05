@@ -30,8 +30,10 @@ const createEmptyTierProductRecord = (): Record<Tier, ProductDistribution> => ({
 const createEmptyCapacityPlanData = (): CapacityPlanData => ({
   clientsSaberTerByTier: createEmptyTierDistribution(),
   totalClientsSaberTer: 0,
+  clientsExecutarByTier: createEmptyTierDistribution(),
   totalClientsExecutar: 0,
   totalUC: 0,
+  executarUC: 0,
   squadsSaber: 0,
   squadsExecutar: 0,
   totalSquads: 0,
@@ -101,6 +103,7 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       activeClients: createEmptyTierProductRecord(),
       legacyClients: createEmptyTierDistribution(),
       legacyRevenue: createEmptyTierDistribution(),
+      legacyExpansionRevenue: createEmptyTierDistribution(),
       renewals: createEmptyTierProductRecord(),
       renewalRevenue: createEmptyTierProductRecord(),
       expansions: createEmptyTierProductRecord(),
@@ -194,7 +197,19 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
         }
         
         const activatedClients = Math.round(clients * activationRate);
-        const revenue = activatedClients * ticket * revenueActivationRate;
+        
+        // Calcular receita: Executar usa ticket mensal × duração do contrato
+        let revenue: number;
+        if (product === 'executarNoLoyalty') {
+          // NoLoyalty: ticket mensal × 2 meses
+          revenue = activatedClients * ticket * inputs.conversionRates.noLoyaltyDuration * revenueActivationRate;
+        } else if (product === 'executarLoyalty') {
+          // Loyalty: ticket mensal × 7 meses
+          revenue = activatedClients * ticket * inputs.conversionRates.loyaltyDuration * revenueActivationRate;
+        } else {
+          // Outros produtos (Saber, Ter, Potencializar): ticket direto
+          revenue = activatedClients * ticket * revenueActivationRate;
+        }
         
         monthData.revenueByTierProduct[tier][product] = revenue;
         monthData.activeClients[tier][product] = activatedClients;
@@ -242,7 +257,8 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
         if (monthsSinceStart > 0 && monthsSinceStart % inputs.conversionRates.loyaltyDuration === 0) {
           if (cohort.renewals < inputs.conversionRates.loyaltyMaxRenewals) {
             const renewingClients = Math.round(cohort.clients * inputs.conversionRates.loyaltyRenewalRate);
-            const renewalRevenue = renewingClients * metrics.productTickets.executarLoyalty[idx];
+            // Loyalty: ticket mensal × 7 meses
+            const renewalRevenue = renewingClients * metrics.productTickets.executarLoyalty[idx] * inputs.conversionRates.loyaltyDuration;
             
             monthData.renewals[tier].executarLoyalty += renewingClients;
             monthData.renewalRevenue[tier].executarLoyalty += renewalRevenue;
@@ -262,7 +278,8 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
         if (monthsSinceStart > 0 && monthsSinceStart % inputs.conversionRates.noLoyaltyDuration === 0) {
           if (cohort.renewals < inputs.conversionRates.noLoyaltyMaxRenewals) {
             const renewingClients = Math.round(cohort.clients * inputs.conversionRates.noLoyaltyRenewalRate);
-            const renewalRevenue = renewingClients * metrics.productTickets.executarNoLoyalty[idx];
+            // NoLoyalty: ticket mensal × 2 meses
+            const renewalRevenue = renewingClients * metrics.productTickets.executarNoLoyalty[idx] * inputs.conversionRates.noLoyaltyDuration;
             
             monthData.renewals[tier].executarNoLoyalty += renewingClients;
             monthData.renewalRevenue[tier].executarNoLoyalty += renewalRevenue;
@@ -293,7 +310,17 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
         
         for (const product of PRODUCTS) {
           const clients = Math.round(expandingClients * expDist[product]);
-          const revenue = clients * metrics.productTickets[product][idx];
+          const ticket = metrics.productTickets[product][idx];
+          
+          // Calcular receita: Executar usa ticket mensal × duração do contrato
+          let revenue: number;
+          if (product === 'executarNoLoyalty') {
+            revenue = clients * ticket * inputs.conversionRates.noLoyaltyDuration;
+          } else if (product === 'executarLoyalty') {
+            revenue = clients * ticket * inputs.conversionRates.loyaltyDuration;
+          } else {
+            revenue = clients * ticket;
+          }
           
           monthData.expansions[tier][product] += clients;
           monthData.expansionRevenue[tier][product] += revenue;
@@ -315,6 +342,7 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       
       monthData.legacyClients[tier] = remainingClients;
       monthData.legacyRevenue[tier] = remainingRevenue + expansionRevenue;
+      monthData.legacyExpansionRevenue[tier] = expansionRevenue;
       monthData.totalLegacyRevenue += remainingRevenue + expansionRevenue;
       
       // Update for next month
@@ -356,25 +384,28 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       monthData.capacityPlan.totalClientsSaberTer += monthData.capacityPlan.clientsSaberTerByTier[tier];
     }
     
-    // Calcular clientes Executar (legados + novos acumulados)
-    // Base: clientes legados (já são Executar)
+    // Calcular clientes Executar por tier (legados + novos acumulados)
+    // Base: clientes legados (já são Executar) por tier
     for (const tier of TIERS) {
+      monthData.capacityPlan.clientsExecutarByTier[tier] = monthData.legacyClients[tier];
       monthData.capacityPlan.totalClientsExecutar += monthData.legacyClients[tier];
     }
-    // Novos Executar do mês
+    // Novos Executar do mês por tier
     for (const tier of TIERS) {
       const newExecutarLoyalty = monthData.activeClients[tier].executarLoyalty;
       const newExecutarNoLoyalty = monthData.activeClients[tier].executarNoLoyalty;
+      monthData.capacityPlan.clientsExecutarByTier[tier] += newExecutarLoyalty + newExecutarNoLoyalty;
       monthData.capacityPlan.totalClientsExecutar += newExecutarLoyalty + newExecutarNoLoyalty;
     }
-    // Adicionar novos Executar de meses anteriores (acumulado)
+    // Adicionar novos Executar de meses anteriores (acumulado) por tier
     if (prevMonthCapacity) {
-      // Subtrair legados do mês anterior (para não duplicar) e somar o acumulado de novos
-      const prevLegacyTotal = months[months.length - 1].legacyClients 
-        ? Object.values(months[months.length - 1].legacyClients).reduce((sum, val) => sum + val, 0)
-        : 0;
-      const prevNewExecutar = prevMonthCapacity.totalClientsExecutar - prevLegacyTotal;
-      monthData.capacityPlan.totalClientsExecutar += prevNewExecutar;
+      for (const tier of TIERS) {
+        // Subtrair legados do mês anterior (para não duplicar) e somar o acumulado de novos
+        const prevLegacy = months[months.length - 1].legacyClients[tier];
+        const prevNewExecutar = prevMonthCapacity.clientsExecutarByTier[tier] - prevLegacy;
+        monthData.capacityPlan.clientsExecutarByTier[tier] += prevNewExecutar;
+        monthData.capacityPlan.totalClientsExecutar += prevNewExecutar;
+      }
     }
     
     // Calcular Unidades de Capacidade necessárias para Saber+Ter
@@ -386,11 +417,21 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
     }
     monthData.capacityPlan.totalUC = totalUC;
     
+    // Calcular Unidades de Capacidade necessárias para Executar
+    let executarUC = 0;
+    for (const tier of TIERS) {
+      const clients = monthData.capacityPlan.clientsExecutarByTier[tier];
+      // Usar tierWeights do executarSquad se existir, senão fallback para peso 1
+      const weight = capacityConfig.executarSquad.tierWeights?.[tier] ?? 1;
+      executarUC += clients * weight;
+    }
+    monthData.capacityPlan.executarUC = executarUC;
+    
     // Calcular squads necessárias
     monthData.capacityPlan.squadsSaber = Math.ceil(totalUC / capacityConfig.saberSquad.capacityUC);
-    monthData.capacityPlan.squadsExecutar = Math.ceil(
-      monthData.capacityPlan.totalClientsExecutar / capacityConfig.executarSquad.clientsPerSquad
-    );
+    // Usar capacityUC do executarSquad se existir, senão fallback para clientsPerSquad
+    const executarCapacityUC = capacityConfig.executarSquad.capacityUC ?? capacityConfig.executarSquad.clientsPerSquad;
+    monthData.capacityPlan.squadsExecutar = Math.ceil(executarUC / executarCapacityUC);
     monthData.capacityPlan.totalSquads = monthData.capacityPlan.squadsSaber + monthData.capacityPlan.squadsExecutar;
     
     // Calcular headcount
@@ -409,9 +450,9 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       monthData.capacityPlan.ucUtilization = totalUC / maxUC;
     }
     
-    const maxExecutar = monthData.capacityPlan.squadsExecutar * capacityConfig.executarSquad.clientsPerSquad;
-    if (maxExecutar > 0) {
-      monthData.capacityPlan.executarUtilization = monthData.capacityPlan.totalClientsExecutar / maxExecutar;
+    const maxExecutarUC = monthData.capacityPlan.squadsExecutar * executarCapacityUC;
+    if (maxExecutarUC > 0) {
+      monthData.capacityPlan.executarUtilization = executarUC / maxExecutarUC;
     }
     
     months.push(monthData);

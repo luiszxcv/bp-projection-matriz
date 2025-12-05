@@ -49,13 +49,15 @@ const defaultTierMetrics: Record<Tier, TierMetrics> = {
       executarLoyalty: 0.30,
       potencializar: 0.10,
     }),
-    productTickets: fillProductMonthly({
-      saber: 30000,
-      ter: 18000,
-      executarNoLoyalty: 22000,
-      executarLoyalty: 99000,
-      potencializar: 0,
-    }),
+    productTickets: {
+      // Large Saber: Q1=25k, Q2=40k, Q3=80k, Q4=120k
+      saber: [25000, 25000, 25000, 40000, 40000, 40000, 80000, 80000, 80000, 120000, 120000, 120000],
+      ter: fill12(18000),
+      // Large Executar (ticket MENSAL): Q1=11k, Q2=15k, Q3=20k, Q4=20k
+      executarNoLoyalty: [11000, 11000, 11000, 15000, 15000, 15000, 20000, 20000, 20000, 20000, 20000, 20000],
+      executarLoyalty: [11000, 11000, 11000, 15000, 15000, 15000, 20000, 20000, 20000, 20000, 20000, 20000],
+      potencializar: fill12(0),
+    },
   },
   medium: {
     mqlDistribution: fill12(0.2023),
@@ -71,13 +73,15 @@ const defaultTierMetrics: Record<Tier, TierMetrics> = {
       executarLoyalty: 0.15,
       potencializar: 0.00,
     }),
-    productTickets: fillProductMonthly({
-      saber: 30000,
-      ter: 15000,
-      executarNoLoyalty: 14000,
-      executarLoyalty: 49000,
-      potencializar: 0,
-    }),
+    productTickets: {
+      // Medium Saber: Q1=20k, Q2=40k, Q3=80k, Q4=100k
+      saber: [20000, 20000, 20000, 40000, 40000, 40000, 80000, 80000, 80000, 100000, 100000, 100000],
+      ter: fill12(15000),
+      // Medium Executar (ticket MENSAL): Q1=7k, Q2=8k, Q3=9k, Q4=10k
+      executarNoLoyalty: [7000, 7000, 7000, 8000, 8000, 8000, 9000, 9000, 9000, 10000, 10000, 10000],
+      executarLoyalty: [7000, 7000, 7000, 8000, 8000, 8000, 9000, 9000, 9000, 10000, 10000, 10000],
+      potencializar: fill12(0),
+    },
   },
   small: {
     mqlDistribution: fill12(0.4760),
@@ -93,13 +97,15 @@ const defaultTierMetrics: Record<Tier, TierMetrics> = {
       executarLoyalty: 0.00,
       potencializar: 0.00,
     }),
-    productTickets: fillProductMonthly({
-      saber: 30000,
-      ter: 11500,
-      executarNoLoyalty: 0,
-      executarLoyalty: 0,
-      potencializar: 0,
-    }),
+    productTickets: {
+      // Small Saber: Q1=20k, Q2=30k, Q3=30k, Q4=40k
+      saber: [20000, 20000, 20000, 30000, 30000, 30000, 30000, 30000, 30000, 40000, 40000, 40000],
+      ter: fill12(11500),
+      // Small Executar (ticket MENSAL): fixo 7k
+      executarNoLoyalty: fill12(7000),
+      executarLoyalty: fill12(7000),
+      potencializar: fill12(0),
+    },
   },
   tiny: {
     mqlDistribution: fill12(0.2246),
@@ -115,13 +121,15 @@ const defaultTierMetrics: Record<Tier, TierMetrics> = {
       executarLoyalty: 0.00,
       potencializar: 0.00,
     }),
-    productTickets: fillProductMonthly({
-      saber: 30000,
-      ter: 7500,
-      executarNoLoyalty: 0,
-      executarLoyalty: 0,
-      potencializar: 0,
-    }),
+    productTickets: {
+      // Tiny Saber: Q1=13k, Q2=15k, Q3=20k, Q4=30k
+      saber: [13000, 13000, 13000, 15000, 15000, 15000, 20000, 20000, 20000, 30000, 30000, 30000],
+      ter: fill12(7500),
+      // Tiny Executar (ticket MENSAL): fixo 7k (mesmo que Small)
+      executarNoLoyalty: fill12(7000),
+      executarLoyalty: fill12(7000),
+      potencializar: fill12(0),
+    },
   },
 };
 
@@ -203,7 +211,15 @@ export const defaultInputs: SimulationInputs = {
     },
     executarSquad: {
       headcount: 15,
-      clientsPerSquad: 20,
+      clientsPerSquad: 20, // Mantido para compatibilidade
+      capacityUC: 20,      // UC por squad Executar
+      tierWeights: {
+        enterprise: 2.5,
+        large: 2.0,
+        medium: 1.5,
+        small: 1.0,
+        tiny: 0.5,
+      },
     },
   },
 };

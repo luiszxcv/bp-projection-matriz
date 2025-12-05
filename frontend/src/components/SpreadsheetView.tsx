@@ -4,6 +4,7 @@ import { MONTHS, TIER_LABELS, PRODUCT_LABELS } from '@/data/defaultInputs';
 import { SpreadsheetCell, RowHeader, ColumnHeader } from './SpreadsheetCell';
 import { formatCurrency, formatNumber, formatPercentage } from '@/lib/calculations';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { 
   InvestmentChart, 
@@ -79,6 +80,10 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
     totalClients: false,
     capacityHC: false,
   });
+
+  // Estado para filtro do funil por tier
+  type FunnelFilter = 'all' | 'tickets' | 'rates' | 'distribution' | 'results';
+  const [funnelFilter, setFunnelFilter] = useState<FunnelFilter>('all');
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -402,12 +407,30 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
 
           {/* FUNNEL BY TIER */}
           <div className="flex">
-            <RowHeader 
-              label="FUNIL POR TIER" 
-              level="section"
-              expanded={expandedSections.funnel}
-              onToggle={() => toggleSection('funnel')}
-            />
+            <div className="spreadsheet-row-header sticky left-0 z-20 bg-card flex items-center gap-2">
+              <div className="flex-1 flex items-center">
+                <RowHeader 
+                  label="FUNIL POR TIER" 
+                  level="section"
+                  expanded={expandedSections.funnel}
+                  onToggle={() => toggleSection('funnel')}
+                />
+              </div>
+              {expandedSections.funnel && (
+                <Select value={funnelFilter} onValueChange={(v) => setFunnelFilter(v as FunnelFilter)}>
+                  <SelectTrigger className="h-6 w-[120px] text-xs mr-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tudo</SelectItem>
+                    <SelectItem value="tickets">💰 Tickets</SelectItem>
+                    <SelectItem value="rates">📊 Taxas</SelectItem>
+                    <SelectItem value="distribution">📈 Distribuição</SelectItem>
+                    <SelectItem value="results">🎯 Resultados</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
             {[...Array(13)].map((_, i) => (
               <div key={i} className="spreadsheet-cell bg-primary/10" />
             ))}
@@ -423,7 +446,8 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 ))}
               </div>
 
-              {/* MQL Distribution */}
+              {/* MQL Distribution - distribution */}
+              {(funnelFilter === 'all' || funnelFilter === 'distribution') && (
               <div className="flex row-hover">
                 <RowHeader label="% Distribuição MQL" tooltip={TOOLTIPS.mqlDistribution} className="pl-6" />
                 {MONTHS.map((_, i) => (
@@ -441,8 +465,10 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                   className="bg-primary/10"
                 />
               </div>
+              )}
 
-              {/* MQLs */}
+              {/* MQLs - results */}
+              {(funnelFilter === 'all' || funnelFilter === 'results') && (
               <div className="flex row-hover">
                 <RowHeader label="# MQLs" tooltip={TOOLTIPS.mqls} className="pl-6" />
                 {monthlyData.map((m, i) => (
@@ -454,8 +480,10 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                   className="bg-primary/10 font-semibold"
                 />
               </div>
+              )}
 
-              {/* MQL→SQL Rate */}
+              {/* MQL→SQL Rate - rates */}
+              {(funnelFilter === 'all' || funnelFilter === 'rates') && (
               <div className="flex row-hover">
                 <RowHeader label="% MQL → SQL" tooltip={TOOLTIPS.mqlToSqlRate} className="pl-6" />
                 {MONTHS.map((_, i) => (
@@ -473,8 +501,10 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                   className="bg-primary/10"
                 />
               </div>
+              )}
 
-              {/* SQLs */}
+              {/* SQLs - results */}
+              {(funnelFilter === 'all' || funnelFilter === 'results') && (
               <div className="flex row-hover">
                 <RowHeader label="# SQLs" tooltip={TOOLTIPS.sqls} className="pl-6" />
                 {monthlyData.map((m, i) => (
@@ -486,8 +516,10 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                   className="bg-primary/10 font-semibold"
                 />
               </div>
+              )}
 
-              {/* SQL→SAL Rate */}
+              {/* SQL→SAL Rate - rates */}
+              {(funnelFilter === 'all' || funnelFilter === 'rates') && (
               <div className="flex row-hover">
                 <RowHeader label="% SQL → SAL" tooltip={TOOLTIPS.sqlToSalRate} className="pl-6" />
                 {MONTHS.map((_, i) => (
@@ -505,8 +537,10 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                   className="bg-primary/10"
                 />
               </div>
+              )}
 
-              {/* SALs */}
+              {/* SALs - results */}
+              {(funnelFilter === 'all' || funnelFilter === 'results') && (
               <div className="flex row-hover">
                 <RowHeader label="# SALs" tooltip={TOOLTIPS.sals} className="pl-6" />
                 {monthlyData.map((m, i) => (
@@ -518,8 +552,10 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                   className="bg-primary/10 font-semibold"
                 />
               </div>
+              )}
 
-              {/* SAL→WON Rate */}
+              {/* SAL→WON Rate - rates */}
+              {(funnelFilter === 'all' || funnelFilter === 'rates') && (
               <div className="flex row-hover">
                 <RowHeader label="% SAL → WON" tooltip={TOOLTIPS.salToWonRate} className="pl-6" />
                 {MONTHS.map((_, i) => (
@@ -537,8 +573,10 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                   className="bg-primary/10"
                 />
               </div>
+              )}
 
-              {/* WONs */}
+              {/* WONs - results */}
+              {(funnelFilter === 'all' || funnelFilter === 'results') && (
               <div className="flex row-hover">
                 <RowHeader label="# WONs" tooltip={TOOLTIPS.wons} className="pl-6" />
                 {monthlyData.map((m, i) => (
@@ -550,8 +588,10 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                   className="bg-primary/10 font-semibold"
                 />
               </div>
+              )}
 
-              {/* Activation Rate */}
+              {/* Activation Rate - rates */}
+              {(funnelFilter === 'all' || funnelFilter === 'rates') && (
               <div className="flex row-hover">
                 <RowHeader label="% Ativação" tooltip={TOOLTIPS.activationRate} className="pl-6" />
                 {MONTHS.map((_, i) => (
@@ -569,8 +609,10 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                   className="bg-primary/10"
                 />
               </div>
+              )}
 
-              {/* Activations */}
+              {/* Activations - results */}
+              {(funnelFilter === 'all' || funnelFilter === 'results') && (
               <div className="flex row-hover">
                 <RowHeader label="# Ativações" tooltip={TOOLTIPS.activations} className="pl-6" />
                 {monthlyData.map((m, i) => (
@@ -582,11 +624,13 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                   className="bg-primary/10 font-semibold"
                 />
               </div>
+              )}
 
               {/* Product breakdown */}
               {PRODUCTS.map((product) => (
                 <React.Fragment key={product}>
-                  {/* Product Qty (Clients) */}
+                  {/* Product Qty (Clients) - results */}
+                  {(funnelFilter === 'all' || funnelFilter === 'results') && (
                   <div className="flex row-hover">
                     <RowHeader 
                       label={`# Clientes ${PRODUCT_LABELS[product]}`} 
@@ -606,8 +650,10 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                       className="bg-primary/10 font-semibold"
                     />
                   </div>
+                  )}
 
-                  {/* Product Distribution */}
+                  {/* Product Distribution - distribution */}
+                  {(funnelFilter === 'all' || funnelFilter === 'distribution') && (
                   <div className="flex row-hover">
                     <RowHeader 
                       label={`% ${PRODUCT_LABELS[product]}`} 
@@ -629,8 +675,10 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                       className="bg-primary/10"
                     />
                   </div>
+                  )}
 
-                  {/* Product Ticket */}
+                  {/* Product Ticket - tickets */}
+                  {(funnelFilter === 'all' || funnelFilter === 'tickets') && (
                   <div className="flex row-hover">
                     <RowHeader 
                       label={`$ Ticket ${PRODUCT_LABELS[product]}`} 
@@ -652,8 +700,10 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                       className="bg-primary/10"
                     />
                   </div>
+                  )}
 
-                  {/* Product Revenue */}
+                  {/* Product Revenue - results */}
+                  {(funnelFilter === 'all' || funnelFilter === 'results') && (
                   <div className="flex row-hover">
                     <RowHeader 
                       label={`$ Receita ${PRODUCT_LABELS[product]}`} 
@@ -673,6 +723,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                       className="bg-primary/10 font-semibold"
                     />
                   </div>
+                  )}
                 </React.Fragment>
               ))}
             </React.Fragment>
@@ -1083,8 +1134,42 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                   className="bg-primary/10 font-semibold"
                 />
               </div>
+
+              <div className="flex row-hover">
+                <RowHeader label={`${TIER_LABELS[tier]} - $ Expansão`} tooltip="Receita de expansão da base legada" className="pl-6" />
+                {monthlyData.map((m, i) => (
+                  <SpreadsheetCell
+                    key={i}
+                    value={m.legacyExpansionRevenue[tier]}
+                    format="currency"
+                  />
+                ))}
+                <SpreadsheetCell
+                  value={monthlyData.reduce((sum, m) => sum + m.legacyExpansionRevenue[tier], 0)}
+                  format="currency"
+                  className="bg-primary/10 font-semibold"
+                />
+              </div>
             </React.Fragment>
           ))}
+
+          {/* Totais Expansão Base Legada */}
+          <div className="flex row-hover bg-primary/5">
+            <RowHeader label="TOTAL $ Expansão Legada" className="font-semibold" />
+            {monthlyData.map((m, i) => (
+              <SpreadsheetCell
+                key={i}
+                value={TIERS.reduce((sum, tier) => sum + m.legacyExpansionRevenue[tier], 0)}
+                format="currency"
+                className="font-semibold"
+              />
+            ))}
+            <SpreadsheetCell
+              value={monthlyData.reduce((sum, m) => sum + TIERS.reduce((s, tier) => s + m.legacyExpansionRevenue[tier], 0), 0)}
+              format="currency"
+              className="bg-primary/10 font-bold"
+            />
+          </div>
             </>
           )}
 
@@ -1642,7 +1727,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
           </div>
 
           <div className="flex row-hover">
-            <RowHeader label="Clientes por Squad" tooltip="Capacidade de clientes por squad" className="pl-6" />
+            <RowHeader label="Clientes por Squad" tooltip="Capacidade de clientes por squad (legacy)" className="pl-6" />
             {MONTHS.map((_, i) => (
               <SpreadsheetCell
                 key={i}
@@ -1658,6 +1743,45 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
               className="bg-primary/10"
             />
           </div>
+
+          <div className="flex row-hover">
+            <RowHeader label="Capacidade UC por Squad" tooltip="Unidades de capacidade por squad Executar" className="pl-6" />
+            {MONTHS.map((_, i) => (
+              <SpreadsheetCell
+                key={i}
+                value={inputs.capacityPlan.executarSquad.capacityUC}
+                onChange={(v) => updateCapacityPlan('executarSquad', 'capacityUC', v)}
+                editable
+                format="number"
+              />
+            ))}
+            <SpreadsheetCell
+              value={inputs.capacityPlan.executarSquad.capacityUC}
+              format="number"
+              className="bg-primary/10"
+            />
+          </div>
+
+          {/* Pesos por Tier Executar */}
+          {TIERS.map((tier) => (
+            <div key={`weight-exec-${tier}`} className="flex row-hover">
+              <RowHeader label={`Peso ${TIER_LABELS[tier]}`} tooltip="Peso de complexidade do tier para Executar" className="pl-6" />
+              {MONTHS.map((_, i) => (
+                <SpreadsheetCell
+                  key={i}
+                  value={inputs.capacityPlan.executarSquad.tierWeights?.[tier] ?? 1}
+                  onChange={(v) => updateCapacityPlan('executarSquad', 'tierWeights', v, tier)}
+                  editable
+                  format="number"
+                />
+              ))}
+              <SpreadsheetCell
+                value={inputs.capacityPlan.executarSquad.tierWeights?.[tier] ?? 1}
+                format="number"
+                className="bg-primary/10"
+              />
+            </div>
+          ))}
 
           {/* Resultados Capacity */}
           <div className="flex">
@@ -1739,6 +1863,33 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
               value={monthlyData[11]?.capacityPlan.totalClientsExecutar || 0}
               format="number"
               className="bg-primary/10 font-semibold"
+            />
+          </div>
+
+          {/* Clientes Executar por Tier */}
+          {TIERS.map((tier) => (
+            <div key={`clients-exec-${tier}`} className="flex row-hover">
+              <RowHeader label={`# Clientes Exec. ${TIER_LABELS[tier]}`} className="pl-6" />
+              {monthlyData.map((m, i) => (
+                <SpreadsheetCell key={i} value={m.capacityPlan.clientsExecutarByTier[tier]} format="number" />
+              ))}
+              <SpreadsheetCell
+                value={monthlyData[11]?.capacityPlan.clientsExecutarByTier[tier] || 0}
+                format="number"
+                className="bg-primary/10"
+              />
+            </div>
+          ))}
+
+          <div className="flex row-hover">
+            <RowHeader label="UC Executar Necessário" tooltip="Unidades de capacidade necessárias para Executar" className="pl-6" />
+            {monthlyData.map((m, i) => (
+              <SpreadsheetCell key={i} value={m.capacityPlan.executarUC} format="number" />
+            ))}
+            <SpreadsheetCell
+              value={monthlyData[11]?.capacityPlan.executarUC || 0}
+              format="number"
+              className="bg-primary/10"
             />
           </div>
 

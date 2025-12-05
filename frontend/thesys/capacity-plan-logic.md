@@ -296,3 +296,52 @@ A nova seção "CAPACITY PLAN" será adicionada após TOTAIS com:
 ---
 
 **Confirme se a lógica está correta antes de prosseguir com a implementação.**
+
+
+---
+
+Agora sem quebrar nada já funcional, preciso extender mais uma linha pra baixo pra fazer o capacity plan.
+
+A meta será ter 2 tipos de coordenações.
+Coordenação Saber e Coordenação Executar.
+
+E o número de players da coordenação será  decidida pela receita por cabeça.
+
+## No geral a DRE dessa 'coordenação' saber será:
+
+1	Coordenador
+1	Account Sr.
+1	Account Jr.
+1	Gestor de Tráfego Pl
+1	Copywriter Sr.
+1	Designer Sr.
+1	Tech
+1	Accoun Pl.
+1	Sales Enablement Jr.
+
+Modelo de distribuição de clientes para a squad do tipo 'saber + ter':
+qty Tipo 'Receita mês'
+4	Tiny	R$ 80.000,00
+4	Small	R$ 120.000,00
+5	Medium	R$ 200.000,00
+2	Large	R$ 100.000,00
+
+identifique o padrão para podermos calcular com os dados que temos (base legada + base nova total)
+
+## No geral a DRE dessa 'coordenação' executar será:
+Average Ticket EXECUTAR	 R$  10.500,00 
+Qty de clientes EXECUTAR	20
+Receita total  estimada R$  210.000,00 
+Receita/HC	 R$  19.000
+Total de pessoas 15
+1	Coordenador
+1	Account 01
+1	Account 02
+1	Account 03
+1	Gestor de Tráfego 01
+1	Gestor de Tráfego 02
+1	Gestor de Tráfego 02
+1	Copywriter
+1	Designer Sr
+2	Designer Pl
+1	Social

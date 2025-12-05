@@ -83,7 +83,9 @@ export interface CapacityPlanConfig {
   };
   executarSquad: {
     headcount: number;           // Pessoas por squad Executar
-    clientsPerSquad: number;     // Clientes por squad
+    clientsPerSquad: number;     // Clientes por squad (legacy, mantido para compatibilidade)
+    capacityUC: number;          // Unidades de capacidade por squad Executar
+    tierWeights: TierDistribution; // Peso de cada tier para Executar
   };
 }
 
@@ -92,10 +94,14 @@ export interface CapacityPlanData {
   clientsSaberTerByTier: TierDistribution;
   // Total clientes Saber+Ter
   totalClientsSaberTer: number;
+  // Clientes Executar por tier
+  clientsExecutarByTier: TierDistribution;
   // Total clientes Executar (Loyalty + NoLoyalty)
   totalClientsExecutar: number;
-  // Unidades de capacidade necessárias
+  // Unidades de capacidade Saber necessárias
   totalUC: number;
+  // Unidades de capacidade Executar necessárias
+  executarUC: number;
   // Squads necessárias
   squadsSaber: number;
   squadsExecutar: number;
@@ -138,6 +144,7 @@ export interface MonthlyData {
   // Legacy
   legacyClients: TierDistribution;
   legacyRevenue: TierDistribution;
+  legacyExpansionRevenue: TierDistribution; // Receita de expansão da base legada por tier
   
   // Renewals
   renewals: Record<Tier, ProductDistribution>;

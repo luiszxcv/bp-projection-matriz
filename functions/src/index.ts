@@ -56,7 +56,7 @@ app.post('/simulations', async (req, res) => {
     const uuid = id || require('crypto').randomUUID();
     await pool.query(
       `INSERT INTO simulations (id, name, inputs, monthly_data, created_at, updated_at) VALUES ($1,$2,$3,$4,now(),now())`,
-      [uuid, name, inputs, monthlyData]
+      [uuid, name, JSON.stringify(inputs), JSON.stringify(monthlyData)]
     );
     res.status(201).json({ id: uuid });
   } catch (err) {
@@ -69,7 +69,7 @@ app.put('/simulations/:id', async (req, res) => {
   try {
     const id = req.params.id;
     const { name, inputs, monthlyData } = req.body;
-    await pool.query(`UPDATE simulations SET name=$1, inputs=$2, monthly_data=$3, updated_at=now() WHERE id=$4`, [name, inputs, monthlyData, id]);
+    await pool.query(`UPDATE simulations SET name=$1, inputs=$2, monthly_data=$3, updated_at=now() WHERE id=$4`, [name, JSON.stringify(inputs), JSON.stringify(monthlyData), id]);
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
