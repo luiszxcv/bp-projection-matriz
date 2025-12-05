@@ -27,14 +27,15 @@ const defaultTierMetrics: Record<Tier, TierMetrics> = {
       executarLoyalty: 0.20,
       potencializar: 0.10,
     }),
-    productTickets: fillProductMonthly({
-      saber: 50000,
-      // Enterprise Ter ticket ramps by quarter: 15k, 20k, 30k, 35k
-      ter: [15000, 15000, 15000, 20000, 20000, 20000, 30000, 30000, 30000, 35000, 35000, 35000],
-      executarNoLoyalty: 29000,
-      executarLoyalty: 145000,
-      potencializar: 0,
-    }),
+    productTickets: {
+      saber: fill12(50000),
+      ter: fill12(31600),
+      // Enterprise Executar No Loyalty (ticket MENSAL): Q1=15k, Q2=20k, Q3=30k, Q4=35k
+      executarNoLoyalty: [15000, 15000, 15000, 20000, 20000, 20000, 30000, 30000, 30000, 35000, 35000, 35000],
+      // Enterprise Executar Loyalty (ticket MENSAL): Q1=15k, Q2=20k, Q3=30k, Q4=35k
+      executarLoyalty: [15000, 15000, 15000, 20000, 20000, 20000, 30000, 30000, 30000, 35000, 35000, 35000],
+      potencializar: fill12(0),
+    },
   },
   large: {
     mqlDistribution: fill12(0.0511),
