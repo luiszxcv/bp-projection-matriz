@@ -114,6 +114,8 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       legacyExpansionByProduct: createEmptyTierProductRecord(),
       renewals: createEmptyTierProductRecord(),
       renewalRevenue: createEmptyTierProductRecord(),
+      activeBaseExpansions: createEmptyTierProductRecord(),
+      activeBaseExpansionRevenue: createEmptyTierProductRecord(),
       expansions: createEmptyTierProductRecord(),
       expansionRevenue: createEmptyTierProductRecord(),
       conversions: {
@@ -170,12 +172,11 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       const wons = Math.round(sals * salToWonRate);
       monthData.wons[tier] = wons;
       
-      // Activations
-      const activations = Math.round(wons * activationRate);
-      monthData.activations[tier] = activations;
+      // Activations - usar floor para garantir que não ultrapasse
+      const activations = Math.floor(wons * activationRate);
       
-      // Distribute WONs across products
-      let remainingWons = wons;
+      // Distribute activations across products (not WONs)
+      let remainingActivations = activations;
       let lowestTicketIndex = 2; // Default to executarNoLoyalty
       let lowestTicket = Infinity;
       
@@ -190,21 +191,26 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
         }
       }
       
-      // Distribute clients and calculate revenue
+      // Track total distributed to verify sum
+      let totalDistributedActivations = 0;
+      
+      // Distribute activated clients and calculate revenue
       for (let i = 0; i < PRODUCTS.length; i++) {
         const product = PRODUCTS[i];
         const distribution = metrics.productDistribution[product][idx];
         const ticket = metrics.productTickets[product][idx];
         
-        let clients: number;
+        let activatedClients: number;
         if (i === lowestTicketIndex) {
-          clients = remainingWons;
+          // Lowest ticket product gets remaining activations
+          activatedClients = remainingActivations;
         } else {
-          clients = Math.floor(wons * distribution);
-          remainingWons -= clients;
+          // Distribute proportionally and use floor
+          activatedClients = Math.floor(activations * distribution);
+          remainingActivations -= activatedClients;
         }
         
-        const activatedClients = Math.round(clients * activationRate);
+        totalDistributedActivations += activatedClients;
         
         // Calcular receita: Executar usa ticket mensal × duração do contrato
         let revenue: number;
@@ -233,6 +239,9 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
         
         monthData.totalNewRevenue += revenue;
       }
+      
+      // Update activations with actual distributed sum
+      monthData.activations[tier] = totalDistributedActivations;
     }
     
     // Process Saber → Executar conversions (after 2 months / 60 days)
@@ -253,12 +262,14 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
         if (loyaltyClients > 0) {
           const loyaltyRevenue = loyaltyClients * metrics.productTickets.executarLoyalty[idx] * inputs.conversionRates.loyaltyDuration;
           monthData.revenueByTierProduct[tier].executarLoyalty += loyaltyRevenue;
+          monthData.activeClients[tier].executarLoyalty += loyaltyClients;
           monthData.totalNewRevenue += loyaltyRevenue;
           activeExecutarLoyalty[tier].push({ clients: loyaltyClients, month, renewals: 0 });
         }
         if (noLoyaltyClients > 0) {
           const noLoyaltyRevenue = noLoyaltyClients * metrics.productTickets.executarNoLoyalty[idx] * inputs.conversionRates.noLoyaltyDuration;
           monthData.revenueByTierProduct[tier].executarNoLoyalty += noLoyaltyRevenue;
+          monthData.activeClients[tier].executarNoLoyalty += noLoyaltyClients;
           monthData.totalNewRevenue += noLoyaltyRevenue;
           activeExecutarNoLoyalty[tier].push({ clients: noLoyaltyClients, month, renewals: 0 });
         }
@@ -308,7 +319,7 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       }
     }
     
-    // Calculate expansion from active Executar clients
+    // Calculate expansion from active Executar clients (base ativa)
     for (const tier of TIERS) {
       const totalActiveExecutar = 
         activeExecutarLoyalty[tier].reduce((sum, c) => sum + c.clients, 0) +
@@ -339,6 +350,11 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
             revenue = clients * ticket;
           }
           
+          // Registrar expansão da base ativa separadamente
+          monthData.activeBaseExpansions[tier][product] += clients;
+          monthData.activeBaseExpansionRevenue[tier][product] += revenue;
+          
+          // Também adicionar ao total combinado (para compatibilidade)
           monthData.expansions[tier][product] += clients;
           monthData.expansionRevenue[tier][product] += revenue;
           monthData.totalExpansionRevenue += revenue;

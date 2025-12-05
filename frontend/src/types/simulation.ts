@@ -159,7 +159,11 @@ export interface MonthlyData {
   renewals: Record<Tier, ProductDistribution>;
   renewalRevenue: Record<Tier, ProductDistribution>;
   
-  // Expansion
+  // Expansion from active Executar base
+  activeBaseExpansions: Record<Tier, ProductDistribution>;
+  activeBaseExpansionRevenue: Record<Tier, ProductDistribution>;
+  
+  // Expansion (combined: active + legacy for backward compatibility)
   expansions: Record<Tier, ProductDistribution>;
   expansionRevenue: Record<Tier, ProductDistribution>;
   
