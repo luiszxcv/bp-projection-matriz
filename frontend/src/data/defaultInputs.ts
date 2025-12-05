@@ -29,7 +29,8 @@ const defaultTierMetrics: Record<Tier, TierMetrics> = {
     }),
     productTickets: fillProductMonthly({
       saber: 50000,
-      ter: 31600,
+      // Enterprise Ter ticket ramps by quarter: 15k, 20k, 30k, 35k
+      ter: [15000, 15000, 15000, 20000, 20000, 20000, 30000, 30000, 30000, 35000, 35000, 35000],
       executarNoLoyalty: 29000,
       executarLoyalty: 145000,
       potencializar: 0,
@@ -90,20 +91,21 @@ const defaultTierMetrics: Record<Tier, TierMetrics> = {
     salToWonRate: fill12(0.30),
     activationRate: fill12(0.93),
     revenueActivationRate: fill12(0.93),
-    productDistribution: fillProductMonthly({
-      saber: 0.80,
-      ter: 0.20,
-      executarNoLoyalty: 0.00,
-      executarLoyalty: 0.00,
-      potencializar: 0.00,
-    }),
+    productDistribution: {
+      // Small: Saber + Ter nos 12 meses; Executar só Jan-Jun (aquisição direta)
+      saber: [0.80, 0.80, 0.80, 0.80, 0.80, 0.80, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00],
+      ter: [0.20, 0.20, 0.20, 0.20, 0.20, 0.20, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00],
+      executarNoLoyalty: fill12(0.00),
+      executarLoyalty: fill12(0.00),
+      potencializar: fill12(0.00),
+    },
     productTickets: {
       // Small Saber: Q1=20k, Q2=30k, Q3=30k, Q4=40k
       saber: [20000, 20000, 20000, 30000, 30000, 30000, 30000, 30000, 30000, 40000, 40000, 40000],
       ter: fill12(11500),
-      // Small Executar (ticket MENSAL): Jan-Jun=7k, Jul-Dez=0
-      executarNoLoyalty: [7000, 7000, 7000, 7000, 7000, 7000, 0, 0, 0, 0, 0, 0],
-      executarLoyalty: [7000, 7000, 7000, 7000, 7000, 7000, 0, 0, 0, 0, 0, 0],
+      // Small Executar (ticket MENSAL): R$7k o ano todo (conversões Saber→Executar)
+      executarNoLoyalty: fill12(7000),
+      executarLoyalty: fill12(7000),
       potencializar: fill12(0),
     },
   },
