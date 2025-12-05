@@ -1,0 +1,199 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 95%;
+
+    --card: 0 0% 6%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 0 72% 51%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 95%;
+
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 60%;
+
+    --accent: 0 60% 40%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 18%;
+    --input: 0 0% 12%;
+    --ring: 0 72% 51%;
+
+    --radius: 0.375rem;
+
+    /* Custom tokens */
+    --cell-editable: 0 40% 15%;
+    --cell-calculated: 0 0% 8%;
+    --cell-header: 0 0% 10%;
+    --cell-tier-enterprise: 0 72% 25%;
+    --cell-tier-large: 0 60% 22%;
+    --cell-tier-medium: 0 50% 20%;
+    --cell-tier-small: 0 40% 18%;
+    --cell-tier-tiny: 0 30% 16%;
+    --text-number: 0 0% 90%;
+    --text-currency: 0 60% 70%;
+    --text-percentage: 0 40% 65%;
+    --border-grid: 0 0% 20%;
+    --row-hover: 0 0% 12%;
+
+    --sidebar-background: 0 0% 5%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 0 72% 51%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 0 72% 51%;
+  }
+
+  .dark {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 6%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 0 72% 51%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 0 60% 40%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 18%;
+    --input: 0 0% 12%;
+    --ring: 0 72% 51%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+@layer components {
+  .cell-editable {
+    @apply bg-[hsl(var(--cell-editable))] border border-primary/30 cursor-text;
+  }
+
+  .cell-calculated {
+    @apply bg-[hsl(var(--cell-calculated))] cursor-default;
+  }
+
+  .cell-header {
+    @apply bg-[hsl(var(--cell-header))] font-semibold;
+  }
+
+  .tier-enterprise {
+    @apply bg-[hsl(var(--cell-tier-enterprise))];
+  }
+
+  .tier-large {
+    @apply bg-[hsl(var(--cell-tier-large))];
+  }
+
+  .tier-medium {
+    @apply bg-[hsl(var(--cell-tier-medium))];
+  }
+
+  .tier-small {
+    @apply bg-[hsl(var(--cell-tier-small))];
+  }
+
+  .tier-tiny {
+    @apply bg-[hsl(var(--cell-tier-tiny))];
+  }
+
+  .text-number {
+    @apply text-[hsl(var(--text-number))] font-mono;
+  }
+
+  .text-currency {
+    @apply text-[hsl(var(--text-currency))] font-mono;
+  }
+
+  .text-percentage {
+    @apply text-[hsl(var(--text-percentage))] font-mono;
+  }
+
+  .grid-border {
+    @apply border-[hsl(var(--border-grid))];
+  }
+
+  .row-hover {
+    @apply hover:bg-[hsl(var(--row-hover))];
+  }
+
+  .spreadsheet-input {
+    @apply bg-transparent border-none outline-none text-right w-full font-mono text-xs;
+    @apply focus:ring-1 focus:ring-primary/50 rounded px-1;
+  }
+
+  .spreadsheet-cell {
+    @apply px-2 py-1.5 text-[11px] border-r border-b border-[hsl(var(--border-grid))] w-[100px] min-w-[100px] max-w-[100px];
+  }
+
+  .spreadsheet-header {
+    @apply px-2 py-1.5 text-[11px] font-semibold border-r border-b border-[hsl(var(--border-grid))] bg-[hsl(var(--cell-header))] sticky top-0 z-10 w-[100px] min-w-[100px] max-w-[100px];
+  }
+
+  .spreadsheet-row-header {
+    @apply px-3 py-1.5 text-[11px] border-r border-b border-[hsl(var(--border-grid))] bg-[hsl(var(--cell-header))] sticky left-0 z-20 w-[260px] min-w-[260px] max-w-[260px];
+  }
+
+  .section-header {
+    @apply px-3 py-1.5 text-xs font-bold border-r border-b border-[hsl(var(--border-grid))] bg-primary/20 sticky left-0 z-20 w-[260px] min-w-[260px] max-w-[260px] cursor-pointer hover:bg-primary/30 transition-colors;
+  }
+
+  .tier-header {
+    @apply px-3 py-1.5 text-[11px] font-semibold border-r border-b border-[hsl(var(--border-grid))] sticky left-0 z-20 w-[260px] min-w-[260px] max-w-[260px];
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted)) hsl(var(--background));
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 4px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+}
