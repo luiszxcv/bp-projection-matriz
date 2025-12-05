@@ -90,10 +90,10 @@ export interface CapacityPlanConfig {
 }
 
 export interface CapacityPlanData {
-  // Clientes acumulados Saber+Ter por tier
-  clientsSaberTerByTier: TierDistribution;
-  // Total clientes Saber+Ter
-  totalClientsSaberTer: number;
+  // Clientes Saber por tier (apenas novos do mês, projeto pontual)
+  clientsSaberByTier: TierDistribution;
+  // Total clientes Saber
+  totalClientsSaber: number;
   // Clientes Executar por tier
   clientsExecutarByTier: TierDistribution;
   // Total clientes Executar (Loyalty + NoLoyalty)
@@ -106,10 +106,18 @@ export interface CapacityPlanData {
   squadsSaber: number;
   squadsExecutar: number;
   totalSquads: number;
-  // Headcount
+  // Headcount necessário
   hcSaber: number;
   hcExecutar: number;
   totalHC: number;
+  // Turnover e contratações
+  turnoverRate: number; // Taxa de turnover (default 7%)
+  turnoverSaber: number; // Pessoas que saem no mês (Saber)
+  turnoverExecutar: number; // Pessoas que saem no mês (Executar)
+  totalTurnover: number; // Total de pessoas que saem
+  hiresSaber: number; // Contratações necessárias (Saber)
+  hiresExecutar: number; // Contratações necessárias (Executar)
+  totalHires: number; // Total de contratações
   // Métricas
   revenuePerHC: number;
   ucUtilization: number; // % de utilização da capacidade Saber
@@ -144,7 +152,8 @@ export interface MonthlyData {
   // Legacy
   legacyClients: TierDistribution;
   legacyRevenue: TierDistribution;
-  legacyExpansionRevenue: TierDistribution; // Receita de expansão da base legada por tier
+  legacyExpansionRevenue: TierDistribution; // Receita de expansão da base legada por tier (total)
+  legacyExpansionByProduct: Record<Tier, ProductDistribution>; // Receita de expansão por produto/tier
   
   // Renewals
   renewals: Record<Tier, ProductDistribution>;

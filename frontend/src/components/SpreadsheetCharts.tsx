@@ -10,6 +10,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  LabelList,
 } from 'recharts';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -57,6 +58,36 @@ const PRODUCT_COLORS: Record<Product, string> = {
   executarNoLoyalty: '#eab308',
   executarLoyalty: '#22c55e',
   potencializar: '#3b82f6',
+};
+
+// Cores para os tiers
+const TIER_COLORS: Record<Tier, string> = {
+  enterprise: '#8b5cf6',
+  large: '#3b82f6',
+  medium: '#22c55e',
+  small: '#eab308',
+  tiny: '#f97316',
+};
+
+const TIER_LABELS: Record<Tier, string> = {
+  enterprise: 'Enterprise',
+  large: 'Large',
+  medium: 'Medium',
+  small: 'Small',
+  tiny: 'Tiny',
+};
+
+// Custom label formatter for currency
+const currencyLabelFormatter = (value: number) => {
+  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
+  return value.toString();
+};
+
+// Custom label formatter for numbers
+const numberLabelFormatter = (value: number) => {
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+  return value.toString();
 };
 
 const TIERS: Tier[] = ['enterprise', 'large', 'medium', 'small', 'tiny'];
@@ -110,7 +141,9 @@ export function InvestmentChart({ investmentMonthly }: InvestmentChartProps) {
             stroke="#ef4444"
             fill="url(#investmentGradient)"
             strokeWidth={2}
-          />
+          >
+            <LabelList dataKey="value" position="top" formatter={currencyLabelFormatter} fill="#888" fontSize={9} />
+          </Area>
         </AreaChart>
       </ResponsiveContainer>
     </ChartContainer>
@@ -164,7 +197,9 @@ export function MQLsChart({ monthlyData }: MQLsChartProps) {
             stroke="#3b82f6"
             fill="url(#mqlsGradient)"
             strokeWidth={2}
-          />
+          >
+            <LabelList dataKey="value" position="top" formatter={numberLabelFormatter} fill="#888" fontSize={9} />
+          </Area>
         </AreaChart>
       </ResponsiveContainer>
     </ChartContainer>
@@ -220,7 +255,9 @@ export function TotalRevenueChart({ monthlyData }: TotalRevenueChartProps) {
             stroke="#22c55e"
             fill="url(#revenueGradient)"
             strokeWidth={2}
-          />
+          >
+            <LabelList dataKey="value" position="top" formatter={currencyLabelFormatter} fill="#888" fontSize={9} />
+          </Area>
         </AreaChart>
       </ResponsiveContainer>
     </ChartContainer>
@@ -300,7 +337,93 @@ export function RevenueByProductChart({ monthlyData }: RevenueByProductChartProp
               dataKey={product}
               stroke={PRODUCT_COLORS[product]}
               strokeWidth={2}
-              dot={false}
+              dot={{ r: 3 }}
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    </ChartContainer>
+  );
+}
+
+// ============================================
+// REVENUE BY TIER CHART
+// ============================================
+interface RevenueByTierChartProps {
+  monthlyData: MonthlyData[];
+}
+
+export function RevenueByTierChart({ monthlyData }: RevenueByTierChartProps) {
+  const [isAccumulated, setIsAccumulated] = useState(false);
+
+  const data = MONTHS.map((month, idx) => {
+    const monthData = monthlyData[idx];
+    
+    const getTierRevenue = (tier: Tier) => {
+      if (!monthData) return 0;
+      // Receita de novos clientes + renovações + expansões + legados
+      return PRODUCTS.reduce((sum, product) => {
+        return sum + 
+          monthData.revenueByTierProduct[tier][product] + 
+          monthData.renewalRevenue[tier][product] + 
+          monthData.expansionRevenue[tier][product];
+      }, 0) + monthData.legacyRevenue[tier];
+    };
+
+    const getAccumulatedTierRevenue = (tier: Tier) => {
+      return monthlyData.slice(0, idx + 1).reduce((sum, m) => {
+        return sum + PRODUCTS.reduce((s, product) => {
+          return s + 
+            m.revenueByTierProduct[tier][product] + 
+            m.renewalRevenue[tier][product] + 
+            m.expansionRevenue[tier][product];
+        }, 0) + m.legacyRevenue[tier];
+      }, 0);
+    };
+
+    const result: Record<string, string | number> = { month };
+    TIERS.forEach(tier => {
+      result[tier] = isAccumulated 
+        ? getAccumulatedTierRevenue(tier) 
+        : getTierRevenue(tier);
+    });
+    return result;
+  });
+
+  return (
+    <ChartContainer
+      title="🏢 Receita por Tier"
+      isAccumulated={isAccumulated}
+      onToggleAccumulated={() => setIsAccumulated(!isAccumulated)}
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+          <XAxis dataKey="month" tick={{ fill: '#888', fontSize: 10 }} />
+          <YAxis 
+            tick={{ fill: '#888', fontSize: 10 }} 
+            tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
+          />
+          <Tooltip
+            contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: 8 }}
+            labelStyle={{ color: '#fff' }}
+            formatter={(value: number, name: string) => [
+              formatCurrency(value), 
+              TIER_LABELS[name as Tier] || name
+            ]}
+          />
+          <Legend 
+            wrapperStyle={{ fontSize: 10 }}
+            formatter={(value) => TIER_LABELS[value as Tier] || value}
+          />
+          {TIERS.map(tier => (
+            <Line
+              key={tier}
+              type="monotone"
+              dataKey={tier}
+              stroke={TIER_COLORS[tier]}
+              strokeWidth={2}
+              dot={{ r: 3 }}
             />
           ))}
         </LineChart>
@@ -365,7 +488,9 @@ export function TotalClientsChart({ monthlyData }: TotalClientsChartProps) {
             stroke="#8b5cf6"
             fill="url(#clientsGradient)"
             strokeWidth={2}
-          />
+          >
+            <LabelList dataKey="value" position="top" formatter={numberLabelFormatter} fill="#888" fontSize={9} />
+          </Area>
         </AreaChart>
       </ResponsiveContainer>
     </ChartContainer>

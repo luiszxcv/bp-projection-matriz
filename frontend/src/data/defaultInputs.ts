@@ -101,9 +101,9 @@ const defaultTierMetrics: Record<Tier, TierMetrics> = {
       // Small Saber: Q1=20k, Q2=30k, Q3=30k, Q4=40k
       saber: [20000, 20000, 20000, 30000, 30000, 30000, 30000, 30000, 30000, 40000, 40000, 40000],
       ter: fill12(11500),
-      // Small Executar (ticket MENSAL): fixo 7k
-      executarNoLoyalty: fill12(7000),
-      executarLoyalty: fill12(7000),
+      // Small Executar (ticket MENSAL): Jan-Jun=7k, Jul-Dez=0
+      executarNoLoyalty: [7000, 7000, 7000, 7000, 7000, 7000, 0, 0, 0, 0, 0, 0],
+      executarLoyalty: [7000, 7000, 7000, 7000, 7000, 7000, 0, 0, 0, 0, 0, 0],
       potencializar: fill12(0),
     },
   },
@@ -125,9 +125,9 @@ const defaultTierMetrics: Record<Tier, TierMetrics> = {
       // Tiny Saber: Q1=13k, Q2=15k, Q3=20k, Q4=30k
       saber: [13000, 13000, 13000, 15000, 15000, 15000, 20000, 20000, 20000, 30000, 30000, 30000],
       ter: fill12(7500),
-      // Tiny Executar (ticket MENSAL): fixo 7k (mesmo que Small)
-      executarNoLoyalty: fill12(7000),
-      executarLoyalty: fill12(7000),
+      // Tiny Executar (ticket MENSAL): sempre 0
+      executarNoLoyalty: fill12(0),
+      executarLoyalty: fill12(0),
       potencializar: fill12(0),
     },
   },
@@ -158,12 +158,12 @@ export const defaultInputs: SimulationInputs = {
     executarLoyaltyRatio: 0.40,
     saberConversionDays: 60,
     loyaltyDuration: 7,
-    loyaltyRenewalRate: 0.30,
+    loyaltyRenewalRate: 0.20,
     loyaltyMaxRenewals: 2,
     noLoyaltyDuration: 2,
-    noLoyaltyRenewalRate: 0.80,
+    noLoyaltyRenewalRate: 0.85,
     noLoyaltyMaxRenewals: 5,
-    expansionRate: 0.05,
+    expansionRate: 0.04,
   },
   legacyBase: {
     enterprise: { revenue: 329176.85, clients: 13 },
@@ -172,7 +172,7 @@ export const defaultInputs: SimulationInputs = {
     small: { revenue: 242719.38, clients: 40 },
     tiny: { revenue: 211102.04, clients: 42 },
     churnRate: 0.07,
-    expansionRate: 0.05,
+    expansionRate: 0.04,
   },
   expansionDistribution: {
     largeEnterprise: {

@@ -5,15 +5,18 @@ import { SpreadsheetCell, RowHeader, ColumnHeader } from './SpreadsheetCell';
 import { formatCurrency, formatNumber, formatPercentage } from '@/lib/calculations';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ChevronDown, ChevronRight, Download } from 'lucide-react';
 import { 
   InvestmentChart, 
   MQLsChart, 
   TotalRevenueChart, 
-  RevenueByProductChart, 
+  RevenueByProductChart,
+  RevenueByTierChart,
   TotalClientsChart,
   CapacityChart 
 } from './SpreadsheetCharts';
+import * as XLSX from 'xlsx';
 
 interface SpreadsheetViewProps {
   simulation: Simulation;
@@ -77,6 +80,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
     mqls: false,
     totalRevenue: false,
     revenueByProduct: false,
+    revenueByTier: false,
     totalClients: false,
     capacityHC: false,
   });
@@ -245,6 +249,165 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
     };
   }, [monthlyData, inputs.topline]);
 
+  // Export to Excel function
+  const exportToExcel = () => {
+    const data: (string | number)[][] = [];
+    const headers = ['Métrica', ...MONTHS, 'Total'];
+    data.push(headers);
+
+    // Helper to add a row
+    const addRow = (label: string, values: number[], total?: number, format?: 'currency' | 'percent' | 'number') => {
+      const row: (string | number)[] = [label];
+      values.forEach(v => row.push(v));
+      row.push(total !== undefined ? total : values.reduce((s, v) => s + v, 0));
+      data.push(row);
+    };
+
+    // TOPLINE
+    data.push(['TOPLINE', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    addRow('$ Investimento', inputs.topline.investmentMonthly, inputs.topline.investmentMonthly.reduce((s, v) => s + v, 0));
+    addRow('$ CPL', inputs.topline.cplMonthly, inputs.topline.cplMonthly.reduce((s, v) => s + v, 0) / 12);
+    addRow('# Total MQLs', monthlyData.map(m => Object.values(m.mqls).reduce((s, v) => s + v, 0)));
+
+    // FUNIL POR TIER
+    data.push(['', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    data.push(['FUNIL POR TIER', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+
+    for (const tier of TIERS) {
+      const metrics = inputs.tierMetrics[tier];
+      data.push([TIER_LABELS[tier], '', '', '', '', '', '', '', '', '', '', '', '', '']);
+      
+      // Distribution & Rates
+      addRow(`  % MQL Distribution`, metrics.mqlDistribution);
+      addRow(`  % MQL → SQL`, metrics.mqlToSqlRate);
+      addRow(`  % SQL → SAL`, metrics.sqlToSalRate);
+      addRow(`  % SAL → WON`, metrics.salToWonRate);
+      addRow(`  % Ativação`, metrics.activationRate);
+      addRow(`  % Receita Ativada`, metrics.revenueActivationRate);
+      
+      // Product Distribution
+      for (const product of PRODUCTS) {
+        addRow(`  % ${PRODUCT_LABELS[product]}`, metrics.productDistribution[product]);
+      }
+      
+      // Product Tickets
+      for (const product of PRODUCTS) {
+        addRow(`  $ Ticket ${PRODUCT_LABELS[product]}`, metrics.productTickets[product]);
+      }
+      
+      // Results
+      addRow(`  # MQLs`, monthlyData.map(m => m.mqls[tier]));
+      addRow(`  # SQLs`, monthlyData.map(m => m.sqls[tier]));
+      addRow(`  # SALs`, monthlyData.map(m => m.sals[tier]));
+      addRow(`  # WONs`, monthlyData.map(m => m.wons[tier]));
+      addRow(`  # Ativações`, monthlyData.map(m => m.activations[tier]));
+      
+      // Revenue by product
+      for (const product of PRODUCTS) {
+        addRow(`  $ Receita ${PRODUCT_LABELS[product]}`, monthlyData.map(m => m.revenueByTierProduct[tier][product]));
+      }
+    }
+
+    // CONVERSION RATES
+    data.push(['', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    data.push(['TAXAS DE CONVERSÃO E RENOVAÇÃO', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    addRow('% Saber → Executar', Array(12).fill(inputs.conversionRates.saberToExecutar));
+    addRow('% Executar Loyalty Ratio', Array(12).fill(inputs.conversionRates.executarLoyaltyRatio));
+    addRow('# Loyalty Duration (meses)', Array(12).fill(inputs.conversionRates.loyaltyDuration));
+    addRow('% Loyalty Renewal Rate', Array(12).fill(inputs.conversionRates.loyaltyRenewalRate));
+    addRow('# No-Loyalty Duration (meses)', Array(12).fill(inputs.conversionRates.noLoyaltyDuration));
+    addRow('% No-Loyalty Renewal Rate', Array(12).fill(inputs.conversionRates.noLoyaltyRenewalRate));
+    addRow('% Expansion Rate', Array(12).fill(inputs.conversionRates.expansionRate));
+
+    // RENEWALS
+    data.push(['', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    data.push(['RENOVAÇÕES', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    for (const tier of TIERS) {
+      addRow(`  # Renovações Loyalty ${TIER_LABELS[tier]}`, monthlyData.map(m => m.renewals[tier].executarLoyalty));
+      addRow(`  $ Receita Renovação Loyalty ${TIER_LABELS[tier]}`, monthlyData.map(m => m.renewalRevenue[tier].executarLoyalty));
+      addRow(`  # Renovações NoLoyalty ${TIER_LABELS[tier]}`, monthlyData.map(m => m.renewals[tier].executarNoLoyalty));
+      addRow(`  $ Receita Renovação NoLoyalty ${TIER_LABELS[tier]}`, monthlyData.map(m => m.renewalRevenue[tier].executarNoLoyalty));
+    }
+    addRow('$ Total Receita Renovação', monthlyData.map(m => m.totalRenewalRevenue));
+
+    // EXPANSIONS
+    data.push(['', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    data.push(['EXPANSÕES', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    for (const tier of TIERS) {
+      for (const product of PRODUCTS) {
+        addRow(`  # Expansão ${PRODUCT_LABELS[product]} ${TIER_LABELS[tier]}`, monthlyData.map(m => m.expansions[tier][product]));
+        addRow(`  $ Receita Expansão ${PRODUCT_LABELS[product]} ${TIER_LABELS[tier]}`, monthlyData.map(m => m.expansionRevenue[tier][product]));
+      }
+    }
+    addRow('$ Total Receita Expansão', monthlyData.map(m => m.totalExpansionRevenue));
+
+    // LEGACY BASE
+    data.push(['', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    data.push(['BASE LEGADA', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    addRow('% Churn Mensal', Array(12).fill(inputs.legacyBase.churnRate));
+    addRow('% Expansão Mensal', Array(12).fill(inputs.legacyBase.expansionRate));
+    for (const tier of TIERS) {
+      addRow(`  $ Receita Legada ${TIER_LABELS[tier]}`, monthlyData.map(m => m.legacyRevenue[tier]));
+      addRow(`  $ Expansão Total ${TIER_LABELS[tier]}`, monthlyData.map(m => m.legacyExpansionRevenue[tier]));
+      for (const product of PRODUCTS) {
+        addRow(`    → ${PRODUCT_LABELS[product]}`, monthlyData.map(m => m.legacyExpansionByProduct[tier][product]));
+      }
+    }
+    addRow('$ Total Receita Legada', monthlyData.map(m => m.totalLegacyRevenue));
+
+    // TOTALS
+    data.push(['', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    data.push(['TOTAIS DE RECEITA', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    addRow('$ Receita Nova Aquisição', monthlyData.map(m => m.totalNewRevenue));
+    addRow('$ Receita Renovação Aquisição', monthlyData.map(m => m.totalRenewalRevenue));
+    addRow('$ Receita Expansão Aquisição', monthlyData.map(m => m.totalExpansionRevenue));
+    addRow('$ Receita Base Legada', monthlyData.map(m => {
+      const legacyBase = TIERS.reduce((s, tier) => s + m.legacyRevenue[tier], 0);
+      const legacyExpansion = TIERS.reduce((s, tier) => s + m.legacyExpansionRevenue[tier], 0);
+      return legacyBase - legacyExpansion;
+    }));
+    addRow('$ Receita Base Legada Expansão', monthlyData.map(m => TIERS.reduce((s, tier) => s + m.legacyExpansionRevenue[tier], 0)));
+    addRow('$ RECEITA TOTAL', monthlyData.map(m => m.totalRevenue));
+
+    // CAPACITY PLAN
+    data.push(['', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    data.push(['PLANO DE CAPACIDADE', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    addRow('# Clientes Saber', monthlyData.map(m => m.capacityPlan.totalClientsSaber));
+    addRow('# UC Saber', monthlyData.map(m => m.capacityPlan.totalUC));
+    addRow('# HC Saber', monthlyData.map(m => m.capacityPlan.hcSaber));
+    addRow('# Clientes Executar', monthlyData.map(m => m.capacityPlan.totalClientsExecutar));
+    addRow('# UC Executar', monthlyData.map(m => m.capacityPlan.executarUC));
+    addRow('# HC Executar', monthlyData.map(m => m.capacityPlan.hcExecutar));
+    addRow('# HC Total', monthlyData.map(m => m.capacityPlan.totalHC));
+    addRow('% Turnover', monthlyData.map(() => 0.07));
+    addRow('# Turnover Saber', monthlyData.map(m => m.capacityPlan.turnoverSaber));
+    addRow('# Turnover Executar', monthlyData.map(m => m.capacityPlan.turnoverExecutar));
+    addRow('# Total Turnover', monthlyData.map(m => m.capacityPlan.totalTurnover));
+    addRow('# Contratações Saber', monthlyData.map(m => m.capacityPlan.hiresSaber));
+    addRow('# Contratações Executar', monthlyData.map(m => m.capacityPlan.hiresExecutar));
+    addRow('# Total Contratações', monthlyData.map(m => m.capacityPlan.totalHires));
+    addRow('$ Receita/HC', monthlyData.map(m => m.capacityPlan.revenuePerHC));
+
+    // Create workbook and worksheet
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 40 }, // Métrica column
+      ...MONTHS.map(() => ({ wch: 15 })),
+      { wch: 15 }, // Total column
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Simulação');
+    
+    // Generate filename with simulation name and date
+    const date = new Date().toISOString().split('T')[0];
+    const filename = `${inputs.name.replace(/[^a-zA-Z0-9]/g, '_')}_${date}.xlsx`;
+    
+    XLSX.writeFile(wb, filename);
+  };
+
   return (
     <div className="h-full flex flex-col bg-background">
       {/* Header with simulation name */}
@@ -269,6 +432,10 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 {formatNumber(annualTotals.totalWons)}
               </span>
             </div>
+            <Button onClick={exportToExcel} variant="outline" size="sm" className="gap-2">
+              <Download className="h-4 w-4" />
+              Exportar Excel
+            </Button>
           </div>
         </div>
       </div>
@@ -407,18 +574,17 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
 
           {/* FUNNEL BY TIER */}
           <div className="flex">
-            <div className="spreadsheet-row-header sticky left-0 z-20 bg-card flex items-center gap-2">
-              <div className="flex-1 flex items-center">
-                <RowHeader 
-                  label="FUNIL POR TIER" 
-                  level="section"
-                  expanded={expandedSections.funnel}
-                  onToggle={() => toggleSection('funnel')}
-                />
-              </div>
+            <div className="spreadsheet-row-header sticky left-0 z-20 bg-card flex items-center justify-between">
+              <button
+                onClick={() => toggleSection('funnel')}
+                className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-primary hover:text-primary/80"
+              >
+                {expandedSections.funnel ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                FUNIL POR TIER
+              </button>
               {expandedSections.funnel && (
                 <Select value={funnelFilter} onValueChange={(v) => setFunnelFilter(v as FunnelFilter)}>
-                  <SelectTrigger className="h-6 w-[120px] text-xs mr-2">
+                  <SelectTrigger className="h-6 w-[120px] text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1136,7 +1302,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
               </div>
 
               <div className="flex row-hover">
-                <RowHeader label={`${TIER_LABELS[tier]} - $ Expansão`} tooltip="Receita de expansão da base legada" className="pl-6" />
+                <RowHeader label={`${TIER_LABELS[tier]} - $ Expansão Total`} tooltip="Receita de expansão da base legada" className="pl-6" />
                 {monthlyData.map((m, i) => (
                   <SpreadsheetCell
                     key={i}
@@ -1150,6 +1316,26 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                   className="bg-primary/10 font-semibold"
                 />
               </div>
+
+              {/* Expansão por Produto */}
+              {PRODUCTS.map((product) => (
+                <div key={`${tier}-expansion-${product}`} className="flex row-hover">
+                  <RowHeader label={`  → ${PRODUCT_LABELS[product]}`} className="pl-10 text-muted-foreground text-xs" />
+                  {monthlyData.map((m, i) => (
+                    <SpreadsheetCell
+                      key={i}
+                      value={m.legacyExpansionByProduct[tier][product]}
+                      format="currency"
+                      className="text-xs"
+                    />
+                  ))}
+                  <SpreadsheetCell
+                    value={monthlyData.reduce((sum, m) => sum + m.legacyExpansionByProduct[tier][product], 0)}
+                    format="currency"
+                    className="bg-primary/10 text-xs"
+                  />
+                </div>
+              ))}
             </React.Fragment>
           ))}
 
@@ -1234,8 +1420,31 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             </div>
           )}
 
+          {/* Chart: Revenue By Tier */}
+          <div className="flex row-hover cursor-pointer" onClick={() => toggleChart('revenueByTier')}>
+            <RowHeader 
+              label={`📊 Gráfico: Receita por Tier`} 
+              className="pl-4 text-primary"
+            />
+            <div className="spreadsheet-cell flex items-center justify-center text-muted-foreground" style={{ width: 'calc(100px * 13)' }}>
+              {showCharts.revenueByTier ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <span className="text-xs">Clique para expandir</span>
+              )}
+            </div>
+          </div>
+          {showCharts.revenueByTier && (
+            <div className="flex">
+              <div className="spreadsheet-row-header sticky left-0 z-20 bg-card" />
+              <div style={{ width: 'calc(100px * 13)' }} className="p-2">
+                <RevenueByTierChart monthlyData={monthlyData} />
+              </div>
+            </div>
+          )}
+
           <div className="flex row-hover">
-            <RowHeader label="$ Receita Nova" />
+            <RowHeader label="$ Receita Nova Aquisição" tooltip="Receita de novos clientes adquiridos no mês" />
             {monthlyData.map((m, i) => (
               <SpreadsheetCell key={i} value={m.totalNewRevenue} format="currency" />
             ))}
@@ -1247,7 +1456,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
           </div>
 
           <div className="flex row-hover">
-            <RowHeader label="$ Receita Renovação" />
+            <RowHeader label="$ Receita Renovação Aquisição" tooltip="Receita de renovações de clientes adquiridos" />
             {monthlyData.map((m, i) => (
               <SpreadsheetCell key={i} value={m.totalRenewalRevenue} format="currency" />
             ))}
@@ -1259,7 +1468,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
           </div>
 
           <div className="flex row-hover">
-            <RowHeader label="$ Receita Expansão" />
+            <RowHeader label="$ Receita Expansão Aquisição" tooltip="Receita de expansão de clientes adquiridos (novos produtos)" />
             {monthlyData.map((m, i) => (
               <SpreadsheetCell key={i} value={m.totalExpansionRevenue} format="currency" />
             ))}
@@ -1271,12 +1480,33 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
           </div>
 
           <div className="flex row-hover">
-            <RowHeader label="$ Receita Base Legada" />
-            {monthlyData.map((m, i) => (
-              <SpreadsheetCell key={i} value={m.totalLegacyRevenue} format="currency" />
-            ))}
+            <RowHeader label="$ Receita Base Legada" tooltip="Receita recorrente da base de clientes existentes (com churn aplicado)" />
+            {monthlyData.map((m, i) => {
+              // Receita base legada SEM expansão = totalLegacyRevenue - soma das expansões
+              const legacyBase = TIERS.reduce((sum, tier) => sum + m.legacyRevenue[tier], 0);
+              const legacyExpansion = TIERS.reduce((sum, tier) => sum + m.legacyExpansionRevenue[tier], 0);
+              const legacyBaseOnly = legacyBase - legacyExpansion;
+              return <SpreadsheetCell key={i} value={legacyBaseOnly} format="currency" />;
+            })}
             <SpreadsheetCell
-              value={annualTotals.totalLegacyRevenue}
+              value={monthlyData.reduce((sum, m) => {
+                const legacyBase = TIERS.reduce((s, tier) => s + m.legacyRevenue[tier], 0);
+                const legacyExpansion = TIERS.reduce((s, tier) => s + m.legacyExpansionRevenue[tier], 0);
+                return sum + (legacyBase - legacyExpansion);
+              }, 0)}
+              format="currency"
+              className="bg-primary/10 font-semibold"
+            />
+          </div>
+
+          <div className="flex row-hover">
+            <RowHeader label="$ Receita Base Legada Expansão" tooltip="Receita de expansão da base legada (upsell/cross-sell de clientes existentes)" />
+            {monthlyData.map((m, i) => {
+              const legacyExpansion = TIERS.reduce((sum, tier) => sum + m.legacyExpansionRevenue[tier], 0);
+              return <SpreadsheetCell key={i} value={legacyExpansion} format="currency" />;
+            })}
+            <SpreadsheetCell
+              value={monthlyData.reduce((sum, m) => sum + TIERS.reduce((s, tier) => s + m.legacyExpansionRevenue[tier], 0), 0)}
               format="currency"
               className="bg-primary/10 font-semibold"
             />
@@ -1791,15 +2021,15 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             ))}
           </div>
 
-          {/* Clientes Saber+Ter por Tier */}
+          {/* Clientes Saber por Tier */}
           {TIERS.map((tier) => (
             <div key={`clients-saber-${tier}`} className="flex row-hover">
-              <RowHeader label={`# Clientes Saber+Ter ${TIER_LABELS[tier]}`} className="pl-6" />
+              <RowHeader label={`# Clientes Saber ${TIER_LABELS[tier]}`} className="pl-6" />
               {monthlyData.map((m, i) => (
-                <SpreadsheetCell key={i} value={m.capacityPlan.clientsSaberTerByTier[tier]} format="number" />
+                <SpreadsheetCell key={i} value={m.capacityPlan.clientsSaberByTier[tier]} format="number" />
               ))}
               <SpreadsheetCell
-                value={monthlyData[11]?.capacityPlan.clientsSaberTerByTier[tier] || 0}
+                value={monthlyData[11]?.capacityPlan.clientsSaberByTier[tier] || 0}
                 format="number"
                 className="bg-primary/10"
               />
@@ -1807,12 +2037,12 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
           ))}
 
           <div className="flex row-hover">
-            <RowHeader label="# Total Clientes Saber+Ter" className="pl-6 font-semibold" />
+            <RowHeader label="# Total Clientes Saber" className="pl-6 font-semibold" />
             {monthlyData.map((m, i) => (
-              <SpreadsheetCell key={i} value={m.capacityPlan.totalClientsSaberTer} format="number" />
+              <SpreadsheetCell key={i} value={m.capacityPlan.totalClientsSaber} format="number" />
             ))}
             <SpreadsheetCell
-              value={monthlyData[11]?.capacityPlan.totalClientsSaberTer || 0}
+              value={monthlyData[11]?.capacityPlan.totalClientsSaber || 0}
               format="number"
               className="bg-primary/10 font-semibold"
             />
@@ -2006,17 +2236,109 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             />
           </div>
 
+          {/* Turnover Section */}
+          <div className="flex">
+            <RowHeader label="Turnover & Contratações" level="tier" tier="small" />
+            {[...Array(13)].map((_, i) => (
+              <div key={i} className="spreadsheet-cell tier-small" />
+            ))}
+          </div>
+
           <div className="flex row-hover">
-            <RowHeader label="$ Receita Saber+Ter" tooltip="Receita dos produtos Saber e Ter" className="pl-6" />
+            <RowHeader label="% Turnover Mensal" tooltip="Taxa de turnover mensal (7%)" className="pl-6" />
+            {monthlyData.map((_, i) => (
+              <SpreadsheetCell key={i} value={0.07} format="percent" />
+            ))}
+            <SpreadsheetCell
+              value={0.07}
+              format="percent"
+              className="bg-primary/10"
+            />
+          </div>
+
+          <div className="flex row-hover">
+            <RowHeader label="# Turnover Saber" tooltip="Pessoas que saem do time Saber" className="pl-6" />
+            {monthlyData.map((m, i) => (
+              <SpreadsheetCell key={i} value={m.capacityPlan.turnoverSaber} format="number" />
+            ))}
+            <SpreadsheetCell
+              value={monthlyData.reduce((sum, m) => sum + m.capacityPlan.turnoverSaber, 0)}
+              format="number"
+              className="bg-primary/10"
+            />
+          </div>
+
+          <div className="flex row-hover">
+            <RowHeader label="# Turnover Executar" tooltip="Pessoas que saem do time Executar" className="pl-6" />
+            {monthlyData.map((m, i) => (
+              <SpreadsheetCell key={i} value={m.capacityPlan.turnoverExecutar} format="number" />
+            ))}
+            <SpreadsheetCell
+              value={monthlyData.reduce((sum, m) => sum + m.capacityPlan.turnoverExecutar, 0)}
+              format="number"
+              className="bg-primary/10"
+            />
+          </div>
+
+          <div className="flex row-hover bg-destructive/10">
+            <RowHeader label="# TOTAL TURNOVER" className="pl-6 font-semibold text-destructive" />
+            {monthlyData.map((m, i) => (
+              <SpreadsheetCell key={i} value={m.capacityPlan.totalTurnover} format="number" className="text-destructive" />
+            ))}
+            <SpreadsheetCell
+              value={monthlyData.reduce((sum, m) => sum + m.capacityPlan.totalTurnover, 0)}
+              format="number"
+              className="bg-destructive/20 font-semibold text-destructive"
+            />
+          </div>
+
+          <div className="flex row-hover">
+            <RowHeader label="# Contratações Saber" tooltip="Contratações necessárias (crescimento + reposição)" className="pl-6" />
+            {monthlyData.map((m, i) => (
+              <SpreadsheetCell key={i} value={m.capacityPlan.hiresSaber} format="number" />
+            ))}
+            <SpreadsheetCell
+              value={monthlyData.reduce((sum, m) => sum + m.capacityPlan.hiresSaber, 0)}
+              format="number"
+              className="bg-primary/10"
+            />
+          </div>
+
+          <div className="flex row-hover">
+            <RowHeader label="# Contratações Executar" tooltip="Contratações necessárias (crescimento + reposição)" className="pl-6" />
+            {monthlyData.map((m, i) => (
+              <SpreadsheetCell key={i} value={m.capacityPlan.hiresExecutar} format="number" />
+            ))}
+            <SpreadsheetCell
+              value={monthlyData.reduce((sum, m) => sum + m.capacityPlan.hiresExecutar, 0)}
+              format="number"
+              className="bg-primary/10"
+            />
+          </div>
+
+          <div className="flex row-hover bg-green-500/10">
+            <RowHeader label="# TOTAL CONTRATAÇÕES" className="pl-6 font-bold text-green-500" />
+            {monthlyData.map((m, i) => (
+              <SpreadsheetCell key={i} value={m.capacityPlan.totalHires} format="number" className="font-bold text-green-500" />
+            ))}
+            <SpreadsheetCell
+              value={monthlyData.reduce((sum, m) => sum + m.capacityPlan.totalHires, 0)}
+              format="number"
+              className="bg-green-500/20 font-bold text-green-500"
+            />
+          </div>
+
+          <div className="flex row-hover">
+            <RowHeader label="$ Receita Saber" tooltip="Receita do produto Saber" className="pl-6" />
             {monthlyData.map((m, i) => {
               const receitaSaber = TIERS.reduce((sum, tier) => 
-                sum + m.revenueByTierProduct[tier].saber + m.revenueByTierProduct[tier].ter, 0);
+                sum + m.revenueByTierProduct[tier].saber, 0);
               return <SpreadsheetCell key={i} value={receitaSaber} format="currency" />;
             })}
             <SpreadsheetCell
               value={monthlyData.reduce((sum, m) => 
                 sum + TIERS.reduce((s, tier) => 
-                  s + m.revenueByTierProduct[tier].saber + m.revenueByTierProduct[tier].ter, 0), 0)}
+                  s + m.revenueByTierProduct[tier].saber, 0), 0)}
               format="currency"
               className="bg-primary/10"
             />

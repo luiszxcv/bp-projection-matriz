@@ -28,8 +28,8 @@ const createEmptyTierProductRecord = (): Record<Tier, ProductDistribution> => ({
 });
 
 const createEmptyCapacityPlanData = (): CapacityPlanData => ({
-  clientsSaberTerByTier: createEmptyTierDistribution(),
-  totalClientsSaberTer: 0,
+  clientsSaberByTier: createEmptyTierDistribution(),
+  totalClientsSaber: 0,
   clientsExecutarByTier: createEmptyTierDistribution(),
   totalClientsExecutar: 0,
   totalUC: 0,
@@ -40,6 +40,13 @@ const createEmptyCapacityPlanData = (): CapacityPlanData => ({
   hcSaber: 0,
   hcExecutar: 0,
   totalHC: 0,
+  turnoverRate: 0.07, // 7% default
+  turnoverSaber: 0,
+  turnoverExecutar: 0,
+  totalTurnover: 0,
+  hiresSaber: 0,
+  hiresExecutar: 0,
+  totalHires: 0,
   revenuePerHC: 0,
   ucUtilization: 0,
   executarUtilization: 0,
@@ -104,6 +111,7 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       legacyClients: createEmptyTierDistribution(),
       legacyRevenue: createEmptyTierDistribution(),
       legacyExpansionRevenue: createEmptyTierDistribution(),
+      legacyExpansionByProduct: createEmptyTierProductRecord(),
       renewals: createEmptyTierProductRecord(),
       renewalRevenue: createEmptyTierProductRecord(),
       expansions: createEmptyTierProductRecord(),
@@ -201,11 +209,11 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
         // Calcular receita: Executar usa ticket mensal × duração do contrato
         let revenue: number;
         if (product === 'executarNoLoyalty') {
-          // NoLoyalty: ticket mensal × 2 meses
-          revenue = activatedClients * ticket * inputs.conversionRates.noLoyaltyDuration * revenueActivationRate;
+          // NoLoyalty: ticket mensal × 2 meses (sem revenueActivationRate - já aplicado nos clientes)
+          revenue = activatedClients * ticket * inputs.conversionRates.noLoyaltyDuration;
         } else if (product === 'executarLoyalty') {
-          // Loyalty: ticket mensal × 7 meses
-          revenue = activatedClients * ticket * inputs.conversionRates.loyaltyDuration * revenueActivationRate;
+          // Loyalty: ticket mensal × 7 meses (sem revenueActivationRate - já aplicado nos clientes)
+          revenue = activatedClients * ticket * inputs.conversionRates.loyaltyDuration;
         } else {
           // Outros produtos (Saber, Ter, Potencializar): ticket direto
           revenue = activatedClients * ticket * revenueActivationRate;
@@ -230,6 +238,8 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
     // Process Saber → Executar conversions (after 2 months / 60 days)
     for (const tier of TIERS) {
       const conversionsToProcess = pendingSaberConversions[tier].filter(c => month - c.month >= 2);
+      const metrics = inputs.tierMetrics[tier];
+      
       for (const conv of conversionsToProcess) {
         const convertingClients = Math.round(conv.clients * inputs.conversionRates.saberToExecutar);
         const loyaltyClients = Math.round(convertingClients * inputs.conversionRates.executarLoyaltyRatio);
@@ -239,10 +249,17 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
         monthData.conversions[tier].loyalty += loyaltyClients;
         monthData.conversions[tier].noLoyalty += noLoyaltyClients;
         
+        // Calcular receita da conversão
         if (loyaltyClients > 0) {
+          const loyaltyRevenue = loyaltyClients * metrics.productTickets.executarLoyalty[idx] * inputs.conversionRates.loyaltyDuration;
+          monthData.revenueByTierProduct[tier].executarLoyalty += loyaltyRevenue;
+          monthData.totalNewRevenue += loyaltyRevenue;
           activeExecutarLoyalty[tier].push({ clients: loyaltyClients, month, renewals: 0 });
         }
         if (noLoyaltyClients > 0) {
+          const noLoyaltyRevenue = noLoyaltyClients * metrics.productTickets.executarNoLoyalty[idx] * inputs.conversionRates.noLoyaltyDuration;
+          monthData.revenueByTierProduct[tier].executarNoLoyalty += noLoyaltyRevenue;
+          monthData.totalNewRevenue += noLoyaltyRevenue;
           activeExecutarNoLoyalty[tier].push({ clients: noLoyaltyClients, month, renewals: 0 });
         }
       }
@@ -340,6 +357,19 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       // Apply expansion
       const expansionRevenue = remainingRevenue * inputs.legacyBase.expansionRate;
       
+      // Distribuir expansão por produtos usando expansionDistribution
+      const expDist = tier === 'enterprise' || tier === 'large' 
+        ? inputs.expansionDistribution.largeEnterprise
+        : tier === 'medium' 
+          ? inputs.expansionDistribution.medium
+          : inputs.expansionDistribution.smallTiny;
+      
+      // Calcular receita de expansão por produto
+      for (const product of PRODUCTS) {
+        const productExpansion = expansionRevenue * expDist[product];
+        monthData.legacyExpansionByProduct[tier][product] = productExpansion;
+      }
+      
       monthData.legacyClients[tier] = remainingClients;
       monthData.legacyRevenue[tier] = remainingRevenue + expansionRevenue;
       monthData.legacyExpansionRevenue[tier] = expansionRevenue;
@@ -368,20 +398,19 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       monthData.totalLegacyRevenue;
     
     // Calculate Capacity Plan
-    // Saber+Ter: clientes NOVOS no mês (projeto pontual, não empilha)
+    // Saber: clientes NOVOS no mês (projeto pontual, não empilha) - SEM TER
     // Executar: clientes legados + novos acumulados mês a mês
     const prevMonthCapacity = months.length > 0 ? months[months.length - 1].capacityPlan : null;
     const capacityConfig = inputs.capacityPlan;
     
-    // Calcular clientes Saber+Ter por tier (apenas novos do mês, NÃO acumula)
+    // Calcular clientes Saber por tier (apenas novos do mês, NÃO acumula) - SEM TER
     for (const tier of TIERS) {
-      // Clientes novos deste mês apenas (projeto pontual)
+      // Clientes novos Saber deste mês apenas (projeto pontual)
       const newSaber = monthData.activeClients[tier].saber;
-      const newTer = monthData.activeClients[tier].ter;
       
-      // Saber+Ter NÃO acumula - são projetos pontuais
-      monthData.capacityPlan.clientsSaberTerByTier[tier] = newSaber + newTer;
-      monthData.capacityPlan.totalClientsSaberTer += monthData.capacityPlan.clientsSaberTerByTier[tier];
+      // Saber NÃO acumula - são projetos pontuais
+      monthData.capacityPlan.clientsSaberByTier[tier] = newSaber;
+      monthData.capacityPlan.totalClientsSaber += newSaber;
     }
     
     // Calcular clientes Executar por tier (legados + novos acumulados)
@@ -408,10 +437,10 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       }
     }
     
-    // Calcular Unidades de Capacidade necessárias para Saber+Ter
+    // Calcular Unidades de Capacidade necessárias para Saber (sem Ter)
     let totalUC = 0;
     for (const tier of TIERS) {
-      const clients = monthData.capacityPlan.clientsSaberTerByTier[tier];
+      const clients = monthData.capacityPlan.clientsSaberByTier[tier];
       const weight = capacityConfig.saberSquad.tierWeights[tier];
       totalUC += clients * weight;
     }
@@ -434,10 +463,31 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
     monthData.capacityPlan.squadsExecutar = Math.ceil(executarUC / executarCapacityUC);
     monthData.capacityPlan.totalSquads = monthData.capacityPlan.squadsSaber + monthData.capacityPlan.squadsExecutar;
     
-    // Calcular headcount
+    // Calcular headcount necessário
     monthData.capacityPlan.hcSaber = monthData.capacityPlan.squadsSaber * capacityConfig.saberSquad.headcount;
     monthData.capacityPlan.hcExecutar = monthData.capacityPlan.squadsExecutar * capacityConfig.executarSquad.headcount;
     monthData.capacityPlan.totalHC = monthData.capacityPlan.hcSaber + monthData.capacityPlan.hcExecutar;
+    
+    // Calcular Turnover e Contratações (7% ao mês)
+    const turnoverRate = 0.07;
+    monthData.capacityPlan.turnoverRate = turnoverRate;
+    
+    // HC do mês anterior (para calcular turnover)
+    const prevHCSaber = prevMonthCapacity?.hcSaber || 0;
+    const prevHCExecutar = prevMonthCapacity?.hcExecutar || 0;
+    
+    // Turnover = pessoas que saem (7% do HC atual)
+    monthData.capacityPlan.turnoverSaber = Math.round(prevHCSaber * turnoverRate);
+    monthData.capacityPlan.turnoverExecutar = Math.round(prevHCExecutar * turnoverRate);
+    monthData.capacityPlan.totalTurnover = monthData.capacityPlan.turnoverSaber + monthData.capacityPlan.turnoverExecutar;
+    
+    // Contratações = crescimento de HC + reposição de turnover
+    const hcGrowthSaber = monthData.capacityPlan.hcSaber - prevHCSaber;
+    const hcGrowthExecutar = monthData.capacityPlan.hcExecutar - prevHCExecutar;
+    
+    monthData.capacityPlan.hiresSaber = Math.max(0, hcGrowthSaber + monthData.capacityPlan.turnoverSaber);
+    monthData.capacityPlan.hiresExecutar = Math.max(0, hcGrowthExecutar + monthData.capacityPlan.turnoverExecutar);
+    monthData.capacityPlan.totalHires = monthData.capacityPlan.hiresSaber + monthData.capacityPlan.hiresExecutar;
     
     // Calcular métricas
     if (monthData.capacityPlan.totalHC > 0) {
