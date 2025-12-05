@@ -4,6 +4,8 @@ import {
   Line,
   AreaChart,
   Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -23,25 +25,56 @@ interface ChartContainerProps {
   children: React.ReactNode;
   isAccumulated: boolean;
   onToggleAccumulated: () => void;
+  showChartType?: boolean;
+  isStackedBar?: boolean;
+  onToggleChartType?: () => void;
 }
 
-function ChartContainer({ title, children, isAccumulated, onToggleAccumulated }: ChartContainerProps) {
+function ChartContainer({ 
+  title, 
+  children, 
+  isAccumulated, 
+  onToggleAccumulated,
+  showChartType = false,
+  isStackedBar = false,
+  onToggleChartType
+}: ChartContainerProps) {
   return (
     <div className="bg-card/50 border border-border rounded-lg p-4 mb-2">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-        <div className="flex items-center gap-2">
-          <Label htmlFor={`toggle-${title}`} className="text-xs text-muted-foreground">
-            Mês
-          </Label>
-          <Switch
-            id={`toggle-${title}`}
-            checked={isAccumulated}
-            onCheckedChange={onToggleAccumulated}
-          />
-          <Label htmlFor={`toggle-${title}`} className="text-xs text-muted-foreground">
-            Acumulado
-          </Label>
+        <div className="flex items-center gap-4">
+          {/* Toggle Acumulado */}
+          <div className="flex items-center gap-2">
+            <Label htmlFor={`toggle-${title}`} className="text-xs text-muted-foreground">
+              Mês
+            </Label>
+            <Switch
+              id={`toggle-${title}`}
+              checked={isAccumulated}
+              onCheckedChange={onToggleAccumulated}
+            />
+            <Label htmlFor={`toggle-${title}`} className="text-xs text-muted-foreground">
+              Acumulado
+            </Label>
+          </div>
+          
+          {/* Toggle Tipo de Gráfico */}
+          {showChartType && onToggleChartType && (
+            <div className="flex items-center gap-2">
+              <Label htmlFor={`chart-type-${title}`} className="text-xs text-muted-foreground">
+                Linhas
+              </Label>
+              <Switch
+                id={`chart-type-${title}`}
+                checked={isStackedBar}
+                onCheckedChange={onToggleChartType}
+              />
+              <Label htmlFor={`chart-type-${title}`} className="text-xs text-muted-foreground">
+                Barras 100%
+              </Label>
+            </div>
+          )}
         </div>
       </div>
       <div className="h-[200px]">
@@ -99,6 +132,7 @@ interface InvestmentChartProps {
 
 export function InvestmentChart({ investmentMonthly }: InvestmentChartProps) {
   const [isAccumulated, setIsAccumulated] = useState(false);
+  const [isStackedBar, setIsStackedBar] = useState(false);
 
   const data = MONTHS.map((month, idx) => {
     const value = investmentMonthly[idx] || 0;
@@ -115,9 +149,28 @@ export function InvestmentChart({ investmentMonthly }: InvestmentChartProps) {
       title="📈 Investimento Mensal"
       isAccumulated={isAccumulated}
       onToggleAccumulated={() => setIsAccumulated(!isAccumulated)}
+      showChartType={true}
+      isStackedBar={isStackedBar}
+      onToggleChartType={() => setIsStackedBar(!isStackedBar)}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+        {isStackedBar ? (
+          <BarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+            <XAxis dataKey="month" tick={{ fill: '#888', fontSize: 10 }} />
+            <YAxis 
+              tick={{ fill: '#888', fontSize: 10 }} 
+              tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+            />
+            <Tooltip
+              contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: 8 }}
+              labelStyle={{ color: '#fff' }}
+              formatter={(value: number) => [formatCurrency(value), 'Investimento']}
+            />
+            <Bar dataKey="value" fill="#ef4444" />
+          </BarChart>
+        ) : (
+          <AreaChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <defs>
             <linearGradient id="investmentGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
@@ -145,6 +198,7 @@ export function InvestmentChart({ investmentMonthly }: InvestmentChartProps) {
             <LabelList dataKey="value" position="top" formatter={currencyLabelFormatter} fill="#888" fontSize={9} />
           </Area>
         </AreaChart>
+        )}
       </ResponsiveContainer>
     </ChartContainer>
   );
@@ -156,6 +210,7 @@ interface MQLsChartProps {
 
 export function MQLsChart({ monthlyData }: MQLsChartProps) {
   const [isAccumulated, setIsAccumulated] = useState(false);
+  const [isStackedBar, setIsStackedBar] = useState(false);
 
   const data = MONTHS.map((month, idx) => {
     const monthData = monthlyData[idx];
@@ -174,9 +229,25 @@ export function MQLsChart({ monthlyData }: MQLsChartProps) {
       title="📊 MQLs Gerados"
       isAccumulated={isAccumulated}
       onToggleAccumulated={() => setIsAccumulated(!isAccumulated)}
+      showChartType={true}
+      isStackedBar={isStackedBar}
+      onToggleChartType={() => setIsStackedBar(!isStackedBar)}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+        {isStackedBar ? (
+          <BarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+            <XAxis dataKey="month" tick={{ fill: '#888', fontSize: 10 }} />
+            <YAxis tick={{ fill: '#888', fontSize: 10 }} />
+            <Tooltip
+              contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: 8 }}
+              labelStyle={{ color: '#fff' }}
+              formatter={(value: number) => [formatNumber(value), 'MQLs']}
+            />
+            <Bar dataKey="value" fill="#3b82f6" />
+          </BarChart>
+        ) : (
+          <AreaChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <defs>
             <linearGradient id="mqlsGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
@@ -201,6 +272,7 @@ export function MQLsChart({ monthlyData }: MQLsChartProps) {
             <LabelList dataKey="value" position="top" formatter={numberLabelFormatter} fill="#888" fontSize={9} />
           </Area>
         </AreaChart>
+        )}
       </ResponsiveContainer>
     </ChartContainer>
   );
@@ -212,6 +284,7 @@ interface TotalRevenueChartProps {
 
 export function TotalRevenueChart({ monthlyData }: TotalRevenueChartProps) {
   const [isAccumulated, setIsAccumulated] = useState(false);
+  const [isStackedBar, setIsStackedBar] = useState(false);
 
   const data = MONTHS.map((month, idx) => {
     const monthData = monthlyData[idx];
@@ -229,9 +302,28 @@ export function TotalRevenueChart({ monthlyData }: TotalRevenueChartProps) {
       title="💰 Receita Total"
       isAccumulated={isAccumulated}
       onToggleAccumulated={() => setIsAccumulated(!isAccumulated)}
+      showChartType={true}
+      isStackedBar={isStackedBar}
+      onToggleChartType={() => setIsStackedBar(!isStackedBar)}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+        {isStackedBar ? (
+          <BarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+            <XAxis dataKey="month" tick={{ fill: '#888', fontSize: 10 }} />
+            <YAxis 
+              tick={{ fill: '#888', fontSize: 10 }} 
+              tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
+            />
+            <Tooltip
+              contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: 8 }}
+              labelStyle={{ color: '#fff' }}
+              formatter={(value: number) => [formatCurrency(value), 'Receita']}
+            />
+            <Bar dataKey="value" fill="#22c55e" />
+          </BarChart>
+        ) : (
+          <AreaChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <defs>
             <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
@@ -259,6 +351,7 @@ export function TotalRevenueChart({ monthlyData }: TotalRevenueChartProps) {
             <LabelList dataKey="value" position="top" formatter={currencyLabelFormatter} fill="#888" fontSize={9} />
           </Area>
         </AreaChart>
+        )}
       </ResponsiveContainer>
     </ChartContainer>
   );
@@ -270,6 +363,7 @@ interface RevenueByProductChartProps {
 
 export function RevenueByProductChart({ monthlyData }: RevenueByProductChartProps) {
   const [isAccumulated, setIsAccumulated] = useState(false);
+  const [isStackedBar, setIsStackedBar] = useState(false);
 
   const data = MONTHS.map((month, idx) => {
     const monthData = monthlyData[idx];
@@ -309,38 +403,73 @@ export function RevenueByProductChart({ monthlyData }: RevenueByProductChartProp
       title="📊 Receita por Produto"
       isAccumulated={isAccumulated}
       onToggleAccumulated={() => setIsAccumulated(!isAccumulated)}
+      showChartType={true}
+      isStackedBar={isStackedBar}
+      onToggleChartType={() => setIsStackedBar(!isStackedBar)}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-          <XAxis dataKey="month" tick={{ fill: '#888', fontSize: 10 }} />
-          <YAxis 
-            tick={{ fill: '#888', fontSize: 10 }} 
-            tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
-          />
-          <Tooltip
-            contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: 8 }}
-            labelStyle={{ color: '#fff' }}
-            formatter={(value: number, name: string) => [
-              formatCurrency(value), 
-              PRODUCT_LABELS[name as Product] || name
-            ]}
-          />
-          <Legend 
-            wrapperStyle={{ fontSize: 10 }}
-            formatter={(value) => PRODUCT_LABELS[value as Product] || value}
-          />
-          {PRODUCTS.map(product => (
-            <Line
-              key={product}
-              type="monotone"
-              dataKey={product}
-              stroke={PRODUCT_COLORS[product]}
-              strokeWidth={2}
-              dot={{ r: 3 }}
+        {isStackedBar ? (
+          <BarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }} stackOffset="expand">
+            <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+            <XAxis dataKey="month" tick={{ fill: '#888', fontSize: 10 }} />
+            <YAxis 
+              tick={{ fill: '#888', fontSize: 10 }} 
+              tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
             />
-          ))}
-        </LineChart>
+            <Tooltip
+              contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: 8 }}
+              labelStyle={{ color: '#fff' }}
+              formatter={(value: number, name: string, props: any) => {
+                const total = PRODUCTS.reduce((sum, p) => sum + (props.payload[p] as number || 0), 0);
+                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+                return [`${formatCurrency(value)} (${percentage}%)`, PRODUCT_LABELS[name as Product] || name];
+              }}
+            />
+            <Legend 
+              wrapperStyle={{ fontSize: 10 }}
+              formatter={(value) => PRODUCT_LABELS[value as Product] || value}
+            />
+            {PRODUCTS.map(product => (
+              <Bar
+                key={product}
+                dataKey={product}
+                stackId="a"
+                fill={PRODUCT_COLORS[product]}
+              />
+            ))}
+          </BarChart>
+        ) : (
+          <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+            <XAxis dataKey="month" tick={{ fill: '#888', fontSize: 10 }} />
+            <YAxis 
+              tick={{ fill: '#888', fontSize: 10 }} 
+              tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
+            />
+            <Tooltip
+              contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: 8 }}
+              labelStyle={{ color: '#fff' }}
+              formatter={(value: number, name: string) => [
+                formatCurrency(value), 
+                PRODUCT_LABELS[name as Product] || name
+              ]}
+            />
+            <Legend 
+              wrapperStyle={{ fontSize: 10 }}
+              formatter={(value) => PRODUCT_LABELS[value as Product] || value}
+            />
+            {PRODUCTS.map(product => (
+              <Line
+                key={product}
+                type="monotone"
+                dataKey={product}
+                stroke={PRODUCT_COLORS[product]}
+                strokeWidth={2}
+                dot={{ r: 3 }}
+              />
+            ))}
+          </LineChart>
+        )}
       </ResponsiveContainer>
     </ChartContainer>
   );
@@ -355,6 +484,7 @@ interface RevenueByTierChartProps {
 
 export function RevenueByTierChart({ monthlyData }: RevenueByTierChartProps) {
   const [isAccumulated, setIsAccumulated] = useState(false);
+  const [isStackedBar, setIsStackedBar] = useState(false);
 
   const data = MONTHS.map((month, idx) => {
     const monthData = monthlyData[idx];
@@ -395,38 +525,73 @@ export function RevenueByTierChart({ monthlyData }: RevenueByTierChartProps) {
       title="🏢 Receita por Tier"
       isAccumulated={isAccumulated}
       onToggleAccumulated={() => setIsAccumulated(!isAccumulated)}
+      showChartType={true}
+      isStackedBar={isStackedBar}
+      onToggleChartType={() => setIsStackedBar(!isStackedBar)}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-          <XAxis dataKey="month" tick={{ fill: '#888', fontSize: 10 }} />
-          <YAxis 
-            tick={{ fill: '#888', fontSize: 10 }} 
-            tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
-          />
-          <Tooltip
-            contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: 8 }}
-            labelStyle={{ color: '#fff' }}
-            formatter={(value: number, name: string) => [
-              formatCurrency(value), 
-              TIER_LABELS[name as Tier] || name
-            ]}
-          />
-          <Legend 
-            wrapperStyle={{ fontSize: 10 }}
-            formatter={(value) => TIER_LABELS[value as Tier] || value}
-          />
-          {TIERS.map(tier => (
-            <Line
-              key={tier}
-              type="monotone"
-              dataKey={tier}
-              stroke={TIER_COLORS[tier]}
-              strokeWidth={2}
-              dot={{ r: 3 }}
+        {isStackedBar ? (
+          <BarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }} stackOffset="expand">
+            <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+            <XAxis dataKey="month" tick={{ fill: '#888', fontSize: 10 }} />
+            <YAxis 
+              tick={{ fill: '#888', fontSize: 10 }} 
+              tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
             />
-          ))}
-        </LineChart>
+            <Tooltip
+              contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: 8 }}
+              labelStyle={{ color: '#fff' }}
+              formatter={(value: number, name: string, props: any) => {
+                const total = TIERS.reduce((sum, t) => sum + (props.payload[t] as number || 0), 0);
+                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+                return [`${formatCurrency(value)} (${percentage}%)`, TIER_LABELS[name as Tier] || name];
+              }}
+            />
+            <Legend 
+              wrapperStyle={{ fontSize: 10 }}
+              formatter={(value) => TIER_LABELS[value as Tier] || value}
+            />
+            {TIERS.map(tier => (
+              <Bar
+                key={tier}
+                dataKey={tier}
+                stackId="a"
+                fill={TIER_COLORS[tier]}
+              />
+            ))}
+          </BarChart>
+        ) : (
+          <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+            <XAxis dataKey="month" tick={{ fill: '#888', fontSize: 10 }} />
+            <YAxis 
+              tick={{ fill: '#888', fontSize: 10 }} 
+              tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
+            />
+            <Tooltip
+              contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: 8 }}
+              labelStyle={{ color: '#fff' }}
+              formatter={(value: number, name: string) => [
+                formatCurrency(value), 
+                TIER_LABELS[name as Tier] || name
+              ]}
+            />
+            <Legend 
+              wrapperStyle={{ fontSize: 10 }}
+              formatter={(value) => TIER_LABELS[value as Tier] || value}
+            />
+            {TIERS.map(tier => (
+              <Line
+                key={tier}
+                type="monotone"
+                dataKey={tier}
+                stroke={TIER_COLORS[tier]}
+                strokeWidth={2}
+                dot={{ r: 3 }}
+              />
+            ))}
+          </LineChart>
+        )}
       </ResponsiveContainer>
     </ChartContainer>
   );
@@ -438,6 +603,7 @@ interface TotalClientsChartProps {
 
 export function TotalClientsChart({ monthlyData }: TotalClientsChartProps) {
   const [isAccumulated, setIsAccumulated] = useState(true); // Default acumulado para clientes
+  const [isStackedBar, setIsStackedBar] = useState(false);
 
   const data = MONTHS.map((month, idx) => {
     const monthData = monthlyData[idx];
@@ -465,9 +631,25 @@ export function TotalClientsChart({ monthlyData }: TotalClientsChartProps) {
       title="👥 Clientes Totais"
       isAccumulated={isAccumulated}
       onToggleAccumulated={() => setIsAccumulated(!isAccumulated)}
+      showChartType={true}
+      isStackedBar={isStackedBar}
+      onToggleChartType={() => setIsStackedBar(!isStackedBar)}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+        {isStackedBar ? (
+          <BarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+            <XAxis dataKey="month" tick={{ fill: '#888', fontSize: 10 }} />
+            <YAxis tick={{ fill: '#888', fontSize: 10 }} />
+            <Tooltip
+              contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: 8 }}
+              labelStyle={{ color: '#fff' }}
+              formatter={(value: number) => [formatNumber(value), isAccumulated ? 'Total Clientes' : 'Novos Clientes']}
+            />
+            <Bar dataKey="value" fill="#8b5cf6" />
+          </BarChart>
+        ) : (
+          <AreaChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <defs>
             <linearGradient id="clientsGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
@@ -492,6 +674,7 @@ export function TotalClientsChart({ monthlyData }: TotalClientsChartProps) {
             <LabelList dataKey="value" position="top" formatter={numberLabelFormatter} fill="#888" fontSize={9} />
           </Area>
         </AreaChart>
+        )}
       </ResponsiveContainer>
     </ChartContainer>
   );
@@ -505,6 +688,8 @@ interface CapacityChartProps {
 }
 
 export function CapacityChart({ monthlyData }: CapacityChartProps) {
+  const [isStackedBar, setIsStackedBar] = useState(false);
+  
   const data = monthlyData.map((m, i) => ({
     month: MONTHS[i],
     hcSaber: m.capacityPlan.hcSaber,
@@ -518,10 +703,56 @@ export function CapacityChart({ monthlyData }: CapacityChartProps) {
     <div className="bg-card/50 border border-border rounded-lg p-4 mb-2">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-foreground">👥 Headcount por Tipo</h3>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="capacity-chart-type" className="text-xs">Tipo:</Label>
+          <Switch
+            id="capacity-chart-type"
+            checked={isStackedBar}
+            onCheckedChange={setIsStackedBar}
+            className="h-5 w-9"
+          />
+          <span className="text-xs text-muted-foreground w-16 text-right">
+            {isStackedBar ? 'Barras 100%' : 'Linhas'}
+          </span>
+        </div>
       </div>
       <div className="h-[220px]">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+          {isStackedBar ? (
+            <BarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }} stackOffset="expand">
+              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+              <XAxis dataKey="month" tick={{ fill: '#888', fontSize: 10 }} />
+              <YAxis 
+                tick={{ fill: '#888', fontSize: 10 }} 
+                tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
+              />
+              <Tooltip
+                contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: 8 }}
+                labelStyle={{ color: '#fff' }}
+                formatter={(value: number, name: string, props: any) => {
+                  const total = (props.payload.hcSaber as number || 0) + (props.payload.hcExecutar as number || 0);
+                  const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+                  const labels: Record<string, string> = {
+                    hcSaber: 'HC Saber',
+                    hcExecutar: 'HC Executar',
+                  };
+                  return [`${formatNumber(value)} (${percentage}%)`, labels[name] || name];
+                }}
+              />
+              <Legend 
+                formatter={(value) => {
+                  const labels: Record<string, string> = {
+                    hcSaber: 'HC Saber',
+                    hcExecutar: 'HC Executar',
+                  };
+                  return labels[value] || value;
+                }}
+              />
+              <Bar dataKey="hcSaber" stackId="1" fill="#3b82f6" />
+              <Bar dataKey="hcExecutar" stackId="1" fill="#22c55e" />
+            </BarChart>
+          ) : (
+            <AreaChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
             <defs>
               <linearGradient id="hcSaberGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
@@ -573,6 +804,7 @@ export function CapacityChart({ monthlyData }: CapacityChartProps) {
               strokeWidth={2}
             />
           </AreaChart>
+        )}
         </ResponsiveContainer>
       </div>
     </div>
