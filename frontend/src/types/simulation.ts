@@ -74,34 +74,48 @@ export interface ExpansionDistribution {
   smallTiny: ProductDistribution;
 }
 
+// Role-based hours per tier for capacity planning
+export interface RoleHoursByTier {
+  tiny: number;
+  small: number;
+  medium: number;
+  large: number;
+  enterprise: number;
+}
+
+export interface SquadRoleHours {
+  [roleName: string]: RoleHoursByTier;
+}
+
 // Capacity Plan Types
 export interface CapacityPlanConfig {
+  initialHCSaber: number;               // HC inicial Saber (pessoas já existentes)
+  initialHCExecutar: number;            // HC inicial Executar (pessoas já existentes)
   saberSquad: {
-    headcount: number;           // Pessoas por squad Saber
-    capacityUC: number;          // Unidades de capacidade por squad
-    tierWeights: TierDistribution; // Peso de cada tier
+    headcount: number;                    // Pessoas por squad Saber
+    productiveHoursPerPerson: number;     // Horas produtivas por pessoa por mês (ex: 144h)
+    roleHours: SquadRoleHours;            // Horas alocadas por cargo por tier
   };
   executarSquad: {
-    headcount: number;           // Pessoas por squad Executar
-    clientsPerSquad: number;     // Clientes por squad (legacy, mantido para compatibilidade)
-    capacityUC: number;          // Unidades de capacidade por squad Executar
-    tierWeights: TierDistribution; // Peso de cada tier para Executar
+    headcount: number;                    // Pessoas por squad Executar
+    productiveHoursPerPerson: number;     // Horas produtivas por pessoa por mês
+    roleHours: SquadRoleHours;            // Horas alocadas por cargo por tier
   };
 }
 
 export interface CapacityPlanData {
-  // Clientes Saber por tier (apenas novos do mês, projeto pontual)
+  // Clientes Saber por tier (apenas novos do mês, projeto pontual - SEM TER)
   clientsSaberByTier: TierDistribution;
   // Total clientes Saber
   totalClientsSaber: number;
-  // Clientes Executar por tier
+  // Clientes Executar por tier (inclui base legada + Executar Loyalty/NoLoyalty + TER)
   clientsExecutarByTier: TierDistribution;
-  // Total clientes Executar (Loyalty + NoLoyalty)
+  // Total clientes Executar (inclui Ter)
   totalClientsExecutar: number;
-  // Unidades de capacidade Saber necessárias
-  totalUC: number;
-  // Unidades de capacidade Executar necessárias
-  executarUC: number;
+  // Horas totais necessárias para Saber
+  totalHoursSaber: number;
+  // Horas totais necessárias para Executar
+  totalHoursExecutar: number;
   // Squads necessárias
   squadsSaber: number;
   squadsExecutar: number;
@@ -120,8 +134,186 @@ export interface CapacityPlanData {
   totalHires: number; // Total de contratações
   // Métricas
   revenuePerHC: number;
-  ucUtilization: number; // % de utilização da capacidade Saber
-  executarUtilization: number; // % de utilização da capacidade Executar
+  hoursUtilizationSaber: number; // % de utilização da capacidade Saber (horas)
+  hoursUtilizationExecutar: number; // % de utilização da capacidade Executar (horas)
+}
+
+// DRE Configuration
+export interface DREConfig {
+  // Percentuais de dedução sobre Revenue
+  inadimplenciaRate: number;        // Default: 4%
+  churnM0FalconsRate: number;       // Default: 3%
+  churnRecebimentoOPSRate: number;  // Default: 2%
+  
+  // Tributos sobre Receita Bruta Recebida
+  royaltiesRate: number;            // Default: 15%
+  issRate: number;                  // Default: 2%
+  irrfRate: number;                 // Default: 1.5%
+  pisRate: number;                  // Default: 1.65%
+  cofinsRate: number;               // Default: 3.65%
+  
+  // CSP (Custo de Serviço Prestado) - Modelo baseado em Squad e Capacidade
+  // SQUAD EXECUTAR (9 pessoas, atende 20 clientes)
+  cspExecutarSquadMensal: number;        // Default: R$ 73.000/squad/mês
+  cspExecutarCapacidadeClientes: number; // Default: 20 clientes/squad
+  cspExecutarCoordenador: number;        // Default: R$ 14.000
+  cspExecutarAccountSr: number;          // Default: R$ 6.500 (2x)
+  cspExecutarGestorTrafegoSr: number;    // Default: R$ 6.500
+  cspExecutarGestorTrafegoPl: number;    // Default: R$ 6.500
+  cspExecutarCopywriter: number;         // Default: R$ 5.000
+  cspExecutarDesignerSr: number;         // Default: R$ 6.000
+  cspExecutarDesignerPl: number;         // Default: R$ 4.500
+  cspExecutarSocialMedia: number;        // Default: R$ 5.000
+  
+  // SQUAD SABER (9 pessoas, atende 15 clientes)
+  cspSaberSquadMensal: number;           // Default: R$ 80.238/squad/mês
+  cspSaberCapacidadeClientes: number;    // Default: 15 clientes/squad
+  cspSaberCoordenador: number;           // Default: R$ 20.000
+  cspSaberAccountSr: number;             // Default: R$ 12.500
+  cspSaberAccountJr: number;             // Default: R$ 5.000
+  cspSaberGestorTrafegoPl: number;       // Default: R$ 10.000
+  cspSaberCopywriter: number;            // Default: R$ 8.000
+  cspSaberDesignerSr: number;            // Default: R$ 8.000
+  cspSaberTech: number;                  // Default: R$ 2.738 (part-time)
+  cspSaberAccountPl: number;             // Default: R$ 8.000
+  cspSaberSalesEnablement: number;       // Default: R$ 6.000
+  
+  // TER usa estrutura similar ao Saber (mesma squad)
+  cspTerUsaSaberSquad: boolean;          // Default: true
+  
+  // Despesas Marketing e Vendas
+  folhaGestaoComercial: number;     // Default: R$ 32.500/mês
+  comissaoM ediaaPorCliente: number; // Default: R$ 2.500/cliente
+  salarioCloser: number;             // Default: R$ 9.000
+  salarioSDR: number;                // Default: R$ 4.500
+  despesasVisitas: number;           // Default: R$ 2.000/mês
+  
+  // Despesas Administrativas (valores fixos mensais)
+  despesasTimeAdm: number;          // Default: R$ 174.400
+  despesasCustosAdm: number;        // Default: R$ 9.905
+  despesasTech: number;              // Default: R$ 36.200
+  despesasUtilities: number;         // Default: R$ 123.350
+  despesasPessoasInicial: number;    // Default: R$ 73.500 (mês 1)
+  despesasPessoasIncremento: number; // Default: R$ 1.750/mês
+  viagensAdmin: number;              // Default: R$ 10.000
+  despesasSoftwares: number;         // Default: R$ 21.672,26
+  despesasServicosTerceirizados: number; // Default: R$ 25.246,50
+  
+  // Financeiro
+  despesasFinanceirasRate: number;  // Default: 1.9% sobre Receita Bruta Recebida
+  irpjRate: number;                  // Default: 15% sobre EBIT
+  csllRate: number;                  // Default: 9% sobre EBIT
+  
+  // Fluxo de Caixa
+  depreciacao: number;               // Default: R$ 8.740,71/mês
+  compraAtivoIntangivel: number;     // Default: R$ 4.985,21/mês
+  pagamentoFinanciamento: number;    // Default: R$ 11.388,93/mês
+  distribuicaoDividendos: number;    // Default: R$ 150.000/mês
+  caixaInicial: number;              // Default: R$ 1.500.000
+}
+
+// DRE Data (resultado dos cálculos por mês)
+export interface DREData {
+  month: number;
+  
+  // RECEITA
+  revenue: number;                        // Revenue total do BP
+  activationRevenue: number;              // Activation (novos)
+  renewalRevenue: number;                 // Renewals
+  expansionRevenue: number;               // Expansions
+  legacyRevenue: number;                  // Base legada
+  
+  // DEDUÇÕES
+  inadimplencia: number;
+  churnM0Falcons: number;
+  churnRecebimentoOPS: number;
+  performanceConversao: number;           // % (0-1)
+  receitaBrutaRecebida: number;
+  
+  // TRIBUTOS
+  royalties: number;
+  iss: number;
+  irrf: number;
+  pis: number;
+  cofins: number;
+  totalImpostos: number;
+  receitaLiquida: number;
+  
+  // CSP (Custo Serviço Prestado)
+  cspExecutar: number;
+  cspExecutarDireto: number;
+  cspExecutarOverhead: number;
+  cspSaber: number;
+  cspSaberDireto: number;
+  cspSaberOverhead: number;
+  cspTer: number;
+  cspTotal: number;
+  percentualCSP: number;                  // % sobre Receita Líquida
+  
+  // MARGEM OPERACIONAL
+  margemOperacional: number;
+  percentualMargemOperacional: number;
+  
+  // DESPESAS MARKETING E VENDAS
+  investimentoMarketing: number;          // Do BP (topline)
+  folhaGestaoComercial: number;
+  despesaComercialActivation: number;
+  comissoes: number;
+  remuneracaoCloser: number;
+  remuneracaoSDR: number;
+  despesasVisitas: number;
+  totalMarketingVendas: number;
+  
+  // MARGEM DE CONTRIBUIÇÃO
+  margemContribuicao: number;
+  percentualMargemContribuicao: number;
+  
+  // DESPESAS ADMINISTRATIVAS
+  despesasTimeAdm: number;
+  despesasCustosAdm: number;
+  despesasTech: number;
+  despesasUtilities: number;
+  despesasPessoas: number;
+  viagensAdmin: number;
+  despesasSoftwares: number;
+  despesasServicosTerceirizados: number;
+  totalDespesasAdm: number;
+  
+  // EBITDA
+  ebitda: number;
+  percentualEBITDA: number;
+  
+  // EBIT
+  despesasFinanceiras: number;
+  receitasFinanceiras: number;
+  ebit: number;
+  
+  // LUCRO LÍQUIDO
+  irpj: number;
+  csll: number;
+  lucroLiquido: number;
+  percentualLucroLiquido: number;
+  
+  // FLUXO DE CAIXA
+  lucroPeríodo: number;
+  contasAReceberBookado: number;
+  taxasRoyaltiesBookado: number;
+  depreciacao: number;
+  caixaOperacional: number;
+  compraAtivoIntangivel: number;
+  caixaInvestimento: number;
+  pagamentoFinanciamento: number;
+  distribuicaoDividendos: number;
+  caixaFinanciamento: number;
+  saldoCaixaMes: number;
+  caixaInicial: number;
+  caixaFinal: number;
+  
+  // KPIs
+  cac: number;                            // Customer Acquisition Cost
+  clv: number;                            // Customer Lifetime Value
+  roi: number;                            // ROI (CLV/CAC - 1)
+  quantidadeClientes: number;             // Total de clientes ativos
 }
 
 export interface SimulationInputs {
@@ -132,6 +324,7 @@ export interface SimulationInputs {
   legacyBase: LegacyBase;
   expansionDistribution: ExpansionDistribution;
   capacityPlan: CapacityPlanConfig;
+  dreConfig: DREConfig;
 }
 
 export interface MonthlyData {
@@ -146,8 +339,11 @@ export interface MonthlyData {
   // Revenue per tier per product
   revenueByTierProduct: Record<Tier, ProductDistribution>;
   
-  // Active clients
+  // Active clients (includes activations + conversions + renewals)
   activeClients: Record<Tier, ProductDistribution>;
+  
+  // Direct funnel activations only (no conversions or renewals)
+  directActivations: Record<Tier, ProductDistribution>;
   
   // Legacy
   legacyClients: TierDistribution;
@@ -180,6 +376,9 @@ export interface MonthlyData {
   
   // Capacity Plan
   capacityPlan: CapacityPlanData;
+  
+  // DRE
+  dre: DREData;
 }
 
 export interface Simulation {

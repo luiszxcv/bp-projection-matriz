@@ -1,4 +1,4 @@
-import { SimulationInputs, MonthlyData, Tier, ProductDistribution, TierDistribution, Product, CapacityPlanData } from '@/types/simulation';
+import { SimulationInputs, MonthlyData, Tier, ProductDistribution, TierDistribution, Product, CapacityPlanData, DREData, DREConfig } from '@/types/simulation';
 
 const TIERS: Tier[] = ['enterprise', 'large', 'medium', 'small', 'tiny'];
 const PRODUCTS: Product[] = ['saber', 'ter', 'executarNoLoyalty', 'executarLoyalty', 'potencializar'];
@@ -32,8 +32,8 @@ const createEmptyCapacityPlanData = (): CapacityPlanData => ({
   totalClientsSaber: 0,
   clientsExecutarByTier: createEmptyTierDistribution(),
   totalClientsExecutar: 0,
-  totalUC: 0,
-  executarUC: 0,
+  totalHoursSaber: 0,
+  totalHoursExecutar: 0,
   squadsSaber: 0,
   squadsExecutar: 0,
   totalSquads: 0,
@@ -48,8 +48,85 @@ const createEmptyCapacityPlanData = (): CapacityPlanData => ({
   hiresExecutar: 0,
   totalHires: 0,
   revenuePerHC: 0,
-  ucUtilization: 0,
-  executarUtilization: 0,
+  hoursUtilizationSaber: 0,
+  hoursUtilizationExecutar: 0,
+});
+
+const createEmptyDREData = (month: number): DREData => ({
+  month,
+  revenue: 0,
+  activationRevenue: 0,
+  renewalRevenue: 0,
+  expansionRevenue: 0,
+  legacyRevenue: 0,
+  inadimplencia: 0,
+  churnM0Falcons: 0,
+  churnRecebimentoOPS: 0,
+  performanceConversao: 0,
+  receitaBrutaRecebida: 0,
+  royalties: 0,
+  iss: 0,
+  irrf: 0,
+  pis: 0,
+  cofins: 0,
+  totalImpostos: 0,
+  receitaLiquida: 0,
+  cspExecutar: 0,
+  cspExecutarDireto: 0,
+  cspExecutarOverhead: 0,
+  cspSaber: 0,
+  cspSaberDireto: 0,
+  cspSaberOverhead: 0,
+  cspTer: 0,
+  cspTotal: 0,
+  percentualCSP: 0,
+  margemOperacional: 0,
+  percentualMargemOperacional: 0,
+  investimentoMarketing: 0,
+  folhaGestaoComercial: 0,
+  despesaComercialActivation: 0,
+  comissoes: 0,
+  remuneracaoCloser: 0,
+  remuneracaoSDR: 0,
+  despesasVisitas: 0,
+  totalMarketingVendas: 0,
+  margemContribuicao: 0,
+  percentualMargemContribuicao: 0,
+  despesasTimeAdm: 0,
+  despesasCustosAdm: 0,
+  despesasTech: 0,
+  despesasUtilities: 0,
+  despesasPessoas: 0,
+  viagensAdmin: 0,
+  despesasSoftwares: 0,
+  despesasServicosTerceirizados: 0,
+  totalDespesasAdm: 0,
+  ebitda: 0,
+  percentualEBITDA: 0,
+  despesasFinanceiras: 0,
+  receitasFinanceiras: 0,
+  ebit: 0,
+  irpj: 0,
+  csll: 0,
+  lucroLiquido: 0,
+  percentualLucroLiquido: 0,
+  lucroPeríodo: 0,
+  contasAReceberBookado: 0,
+  taxasRoyaltiesBookado: 0,
+  depreciacao: 0,
+  caixaOperacional: 0,
+  compraAtivoIntangivel: 0,
+  caixaInvestimento: 0,
+  pagamentoFinanciamento: 0,
+  distribuicaoDividendos: 0,
+  caixaFinanciamento: 0,
+  saldoCaixaMes: 0,
+  caixaInicial: 0,
+  caixaFinal: 0,
+  cac: 0,
+  clv: 0,
+  roi: 0,
+  quantidadeClientes: 0,
 });
 
 export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
@@ -108,6 +185,7 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       activations: createEmptyTierDistribution(),
       revenueByTierProduct: createEmptyTierProductRecord(),
       activeClients: createEmptyTierProductRecord(),
+      directActivations: createEmptyTierProductRecord(),
       legacyClients: createEmptyTierDistribution(),
       legacyRevenue: createEmptyTierDistribution(),
       legacyExpansionRevenue: createEmptyTierDistribution(),
@@ -204,6 +282,7 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
         if (i === lowestTicketIndex) {
           // Lowest ticket product gets remaining activations
           activatedClients = remainingActivations;
+          remainingActivations = 0; // Zero out to prevent subsequent products from getting extra clients
         } else {
           // Distribute proportionally and use floor
           activatedClients = Math.floor(activations * distribution);
@@ -227,6 +306,7 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
         
         monthData.revenueByTierProduct[tier][product] = revenue;
         monthData.activeClients[tier][product] = activatedClients;
+        monthData.directActivations[tier][product] = activatedClients;
         
         // Track for renewals
         if (product === 'saber' && activatedClients > 0) {
@@ -415,7 +495,7 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
     
     // Calculate Capacity Plan
     // Saber: clientes NOVOS no mês (projeto pontual, não empilha) - SEM TER
-    // Executar: clientes legados + novos acumulados mês a mês
+    // Executar: clientes legados + novos acumulados mês a mês (INCLUI TER)
     const prevMonthCapacity = months.length > 0 ? months[months.length - 1].capacityPlan : null;
     const capacityConfig = inputs.capacityPlan;
     
@@ -429,54 +509,58 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       monthData.capacityPlan.totalClientsSaber += newSaber;
     }
     
-    // Calcular clientes Executar por tier (legados + novos acumulados)
-    // Base: clientes legados (já são Executar) por tier
+    // Calcular clientes Executar por tier (legados + novos acumulados + TER)
+    // activeClients de Executar JÁ inclui conversões acumuladas de meses anteriores
     for (const tier of TIERS) {
-      monthData.capacityPlan.clientsExecutarByTier[tier] = monthData.legacyClients[tier];
-      monthData.capacityPlan.totalClientsExecutar += monthData.legacyClients[tier];
-    }
-    // Novos Executar do mês por tier
-    for (const tier of TIERS) {
-      const newExecutarLoyalty = monthData.activeClients[tier].executarLoyalty;
-      const newExecutarNoLoyalty = monthData.activeClients[tier].executarNoLoyalty;
-      monthData.capacityPlan.clientsExecutarByTier[tier] += newExecutarLoyalty + newExecutarNoLoyalty;
-      monthData.capacityPlan.totalClientsExecutar += newExecutarLoyalty + newExecutarNoLoyalty;
-    }
-    // Adicionar novos Executar de meses anteriores (acumulado) por tier
-    if (prevMonthCapacity) {
-      for (const tier of TIERS) {
-        // Subtrair legados do mês anterior (para não duplicar) e somar o acumulado de novos
-        const prevLegacy = months[months.length - 1].legacyClients[tier];
-        const prevNewExecutar = prevMonthCapacity.clientsExecutarByTier[tier] - prevLegacy;
-        monthData.capacityPlan.clientsExecutarByTier[tier] += prevNewExecutar;
-        monthData.capacityPlan.totalClientsExecutar += prevNewExecutar;
-      }
+      // Base legada
+      const legacy = monthData.legacyClients[tier];
+      // Executar ativos (loyalty + no-loyalty) - JÁ inclui conversões acumuladas
+      const executarActive = monthData.activeClients[tier].executarLoyalty + monthData.activeClients[tier].executarNoLoyalty;
+      // Ter agora vai para Executar
+      const ter = monthData.activeClients[tier].ter;
+      
+      monthData.capacityPlan.clientsExecutarByTier[tier] = legacy + executarActive + ter;
+      monthData.capacityPlan.totalClientsExecutar += legacy + executarActive + ter;
     }
     
-    // Calcular Unidades de Capacidade necessárias para Saber (sem Ter)
-    let totalUC = 0;
+    // Calcular horas totais necessárias para Saber (baseado em horas por cargo por tier)
+    let totalHoursSaber = 0;
     for (const tier of TIERS) {
       const clients = monthData.capacityPlan.clientsSaberByTier[tier];
-      const weight = capacityConfig.saberSquad.tierWeights[tier];
-      totalUC += clients * weight;
+      if (clients > 0) {
+        // Somar horas de todos os cargos para este tier
+        let hoursPerClient = 0;
+        for (const role in capacityConfig.saberSquad.roleHours) {
+          const roleHours = capacityConfig.saberSquad.roleHours[role];
+          hoursPerClient += roleHours[tier] || 0;
+        }
+        totalHoursSaber += clients * hoursPerClient;
+      }
     }
-    monthData.capacityPlan.totalUC = totalUC;
+    monthData.capacityPlan.totalHoursSaber = totalHoursSaber;
     
-    // Calcular Unidades de Capacidade necessárias para Executar
-    let executarUC = 0;
+    // Calcular horas totais necessárias para Executar
+    let totalHoursExecutar = 0;
     for (const tier of TIERS) {
       const clients = monthData.capacityPlan.clientsExecutarByTier[tier];
-      // Usar tierWeights do executarSquad se existir, senão fallback para peso 1
-      const weight = capacityConfig.executarSquad.tierWeights?.[tier] ?? 1;
-      executarUC += clients * weight;
+      if (clients > 0) {
+        // Somar horas de todos os cargos para este tier
+        let hoursPerClient = 0;
+        for (const role in capacityConfig.executarSquad.roleHours) {
+          const roleHours = capacityConfig.executarSquad.roleHours[role];
+          hoursPerClient += roleHours[tier] || 0;
+        }
+        totalHoursExecutar += clients * hoursPerClient;
+      }
     }
-    monthData.capacityPlan.executarUC = executarUC;
+    monthData.capacityPlan.totalHoursExecutar = totalHoursExecutar;
     
-    // Calcular squads necessárias
-    monthData.capacityPlan.squadsSaber = Math.ceil(totalUC / capacityConfig.saberSquad.capacityUC);
-    // Usar capacityUC do executarSquad se existir, senão fallback para clientsPerSquad
-    const executarCapacityUC = capacityConfig.executarSquad.capacityUC ?? capacityConfig.executarSquad.clientsPerSquad;
-    monthData.capacityPlan.squadsExecutar = Math.ceil(executarUC / executarCapacityUC);
+    // Calcular squads necessárias baseado em horas disponíveis por squad
+    const hoursPerSquadSaber = capacityConfig.saberSquad.headcount * capacityConfig.saberSquad.productiveHoursPerPerson;
+    const hoursPerSquadExecutar = capacityConfig.executarSquad.headcount * capacityConfig.executarSquad.productiveHoursPerPerson;
+    
+    monthData.capacityPlan.squadsSaber = hoursPerSquadSaber > 0 ? Math.ceil(totalHoursSaber / hoursPerSquadSaber) : 0;
+    monthData.capacityPlan.squadsExecutar = hoursPerSquadExecutar > 0 ? Math.ceil(totalHoursExecutar / hoursPerSquadExecutar) : 0;
     monthData.capacityPlan.totalSquads = monthData.capacityPlan.squadsSaber + monthData.capacityPlan.squadsExecutar;
     
     // Calcular headcount necessário
@@ -488,16 +572,19 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
     const turnoverRate = 0.07;
     monthData.capacityPlan.turnoverRate = turnoverRate;
     
-    // HC do mês anterior (para calcular turnover)
-    const prevHCSaber = prevMonthCapacity?.hcSaber || 0;
-    const prevHCExecutar = prevMonthCapacity?.hcExecutar || 0;
+    // HC do mês anterior (para calcular turnover e crescimento)
+    // Mês 1: usar HC inicial das premissas (3 Saber + 160 Executar)
+    // Demais meses: usar HC do mês anterior
+    const prevHCSaber = prevMonthCapacity?.hcSaber || inputs.capacityPlan.initialHCSaber;
+    const prevHCExecutar = prevMonthCapacity?.hcExecutar || inputs.capacityPlan.initialHCExecutar;
     
-    // Turnover = pessoas que saem (7% do HC atual)
+    // Turnover = pessoas que saem (7% do HC do mês anterior, ou inicial se for mês 1)
     monthData.capacityPlan.turnoverSaber = Math.round(prevHCSaber * turnoverRate);
     monthData.capacityPlan.turnoverExecutar = Math.round(prevHCExecutar * turnoverRate);
     monthData.capacityPlan.totalTurnover = monthData.capacityPlan.turnoverSaber + monthData.capacityPlan.turnoverExecutar;
     
-    // Contratações = crescimento de HC + reposição de turnover
+    // Contratações = (HC necessário - HC anterior) + reposição de turnover
+    // Isso garante que consideramos o HC inicial no mês 1
     const hcGrowthSaber = monthData.capacityPlan.hcSaber - prevHCSaber;
     const hcGrowthExecutar = monthData.capacityPlan.hcExecutar - prevHCExecutar;
     
@@ -510,21 +597,217 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       monthData.capacityPlan.revenuePerHC = monthData.totalRevenue / monthData.capacityPlan.totalHC;
     }
     
-    // Taxa de utilização
-    const maxUC = monthData.capacityPlan.squadsSaber * capacityConfig.saberSquad.capacityUC;
-    if (maxUC > 0) {
-      monthData.capacityPlan.ucUtilization = totalUC / maxUC;
+    // Taxa de utilização (horas utilizadas / horas disponíveis)
+    const maxHoursSaber = monthData.capacityPlan.squadsSaber * hoursPerSquadSaber;
+    if (maxHoursSaber > 0) {
+      monthData.capacityPlan.hoursUtilizationSaber = totalHoursSaber / maxHoursSaber;
     }
     
-    const maxExecutarUC = monthData.capacityPlan.squadsExecutar * executarCapacityUC;
-    if (maxExecutarUC > 0) {
-      monthData.capacityPlan.executarUtilization = executarUC / maxExecutarUC;
+    const maxHoursExecutar = monthData.capacityPlan.squadsExecutar * hoursPerSquadExecutar;
+    if (maxHoursExecutar > 0) {
+      monthData.capacityPlan.hoursUtilizationExecutar = totalHoursExecutar / maxHoursExecutar;
     }
     
     months.push(monthData);
   }
   
+  // Calcular DRE para cada mês
+  let caixaAcumulado = inputs.dreConfig.caixaInicial;
+  for (let i = 0; i < months.length; i++) {
+    months[i].dre = calculateDRE(months[i], inputs, caixaAcumulado);
+    caixaAcumulado = months[i].dre.caixaFinal;
+  }
+  
   return months;
+}
+
+// Função auxiliar para calcular DRE de um mês
+function calculateDRE(
+  monthData: MonthlyData,
+  inputs: SimulationInputs,
+  caixaInicialMes: number
+): DREData {
+  const config = inputs.dreConfig;
+  const dre = createEmptyDREData(monthData.month);
+  const idx = monthData.month - 1;
+  
+  // ========== RECEITA ==========
+  dre.revenue = monthData.totalRevenue;
+  dre.activationRevenue = monthData.totalNewRevenue;
+  dre.renewalRevenue = monthData.totalRenewalRevenue;
+  dre.expansionRevenue = monthData.totalExpansionRevenue;
+  dre.legacyRevenue = monthData.totalLegacyRevenue;
+  
+  // ========== DEDUÇÕES ==========
+  dre.inadimplencia = dre.revenue * config.inadimplenciaRate;
+  dre.churnM0Falcons = dre.revenue * config.churnM0FalconsRate;
+  dre.churnRecebimentoOPS = dre.revenue * config.churnRecebimentoOPSRate;
+  dre.performanceConversao = 1 - (config.inadimplenciaRate + config.churnM0FalconsRate + config.churnRecebimentoOPSRate);
+  dre.receitaBrutaRecebida = dre.revenue - dre.inadimplencia - dre.churnM0Falcons - dre.churnRecebimentoOPS;
+  
+  // ========== TRIBUTOS ==========
+  dre.royalties = dre.receitaBrutaRecebida * config.royaltiesRate;
+  dre.iss = dre.receitaBrutaRecebida * config.issRate;
+  dre.irrf = dre.receitaBrutaRecebida * config.irrfRate;
+  dre.pis = dre.receitaBrutaRecebida * config.pisRate;
+  dre.cofins = dre.receitaBrutaRecebida * config.cofinsRate;
+  dre.totalImpostos = dre.iss + dre.irrf + dre.pis + dre.cofins;
+  dre.receitaLiquida = dre.receitaBrutaRecebida - dre.royalties - dre.totalImpostos;
+  
+  // ========== CSP (Custo de Serviço Prestado) ==========
+  // Modelo: CSP baseado em Squads Necessárias do Capacity Plan
+  // CSP = Número de Squads × Custo Total do Squad
+  
+  // Calcular custo total de cada squad baseado nos salários dos cargos
+  const custoSquadExecutar = 
+    config.cspExecutarCoordenador +
+    (config.cspExecutarAccountSr * 2) + // 2 Account Sr
+    config.cspExecutarGestorTrafegoSr +
+    config.cspExecutarGestorTrafegoPl +
+    config.cspExecutarCopywriter +
+    config.cspExecutarDesignerSr +
+    config.cspExecutarDesignerPl +
+    config.cspExecutarSocialMedia;
+  
+  const custoSquadSaber = 
+    config.cspSaberCoordenador +
+    config.cspSaberAccountSr +
+    config.cspSaberAccountPl +
+    config.cspSaberAccountJr +
+    config.cspSaberGestorTrafegoPl +
+    config.cspSaberCopywriter +
+    config.cspSaberDesignerSr +
+    config.cspSaberTech +
+    config.cspSaberSalesEnablement;
+  
+  // CSP EXECUTAR
+  const squadsExecutarNecessarias = monthData.capacityPlan.squadsExecutar;
+  dre.cspExecutar = squadsExecutarNecessarias * custoSquadExecutar;
+  
+  // Divisão: Coordenador = Overhead, Resto = Operacional
+  dre.cspExecutarOverhead = squadsExecutarNecessarias * config.cspExecutarCoordenador;
+  dre.cspExecutarDireto = dre.cspExecutar - dre.cspExecutarOverhead;
+  
+  // CSP SABER
+  const squadsSaberNecessarias = monthData.capacityPlan.squadsSaber;
+  dre.cspSaber = squadsSaberNecessarias * custoSquadSaber;
+  
+  // Divisão: Coordenador = Overhead, Resto = Operacional
+  dre.cspSaberOverhead = squadsSaberNecessarias * config.cspSaberCoordenador;
+  dre.cspSaberDireto = dre.cspSaber - dre.cspSaberOverhead;
+  
+  // CSP TER
+  // Ter usa estrutura Saber (já está incluído no cálculo de squadsExecutar do Capacity Plan)
+  // Não precisa adicionar separadamente pois Ter já foi contabilizado em Executar
+  dre.cspTer = 0;
+  
+  dre.cspTotal = dre.cspExecutar + dre.cspSaber + dre.cspTer;
+  dre.percentualCSP = dre.receitaLiquida > 0 ? dre.cspTotal / dre.receitaLiquida : 0;
+  
+  // ========== MARGEM OPERACIONAL ==========
+  dre.margemOperacional = dre.receitaLiquida - dre.cspTotal;
+  dre.percentualMargemOperacional = dre.receitaLiquida > 0 ? dre.margemOperacional / dre.receitaLiquida : 0;
+  
+  // ========== DESPESAS MARKETING E VENDAS ==========
+  // Investimento marketing vem do topline do mês
+  dre.investimentoMarketing = inputs.topline.investmentMonthly[idx];
+  dre.folhaGestaoComercial = config.folhaGestaoComercial;
+  
+  // Comissões baseadas em clientes Won
+  const totalWons = TIERS.reduce((sum, tier) => sum + monthData.wons[tier], 0);
+  dre.comissoes = totalWons * config.comissaoMediaPorCliente;
+  
+  // Estimativa de closers e SDRs baseada em volume de investimento
+  // Aproximação: 1 closer para cada R$ 200k de investimento, 1 SDR para cada R$ 300k
+  const qtdClosers = Math.ceil(dre.investimentoMarketing / 200000);
+  const qtdSDRs = Math.ceil(dre.investimentoMarketing / 300000);
+  dre.remuneracaoCloser = qtdClosers * config.salarioCloser;
+  dre.remuneracaoSDR = qtdSDRs * config.salarioSDR;
+  dre.despesasVisitas = config.despesasVisitas;
+  
+  dre.despesaComercialActivation = dre.comissoes + dre.remuneracaoCloser + dre.remuneracaoSDR + dre.despesasVisitas;
+  dre.totalMarketingVendas = dre.investimentoMarketing + dre.folhaGestaoComercial + dre.despesaComercialActivation;
+  
+  // ========== MARGEM DE CONTRIBUIÇÃO ==========
+  dre.margemContribuicao = dre.margemOperacional - dre.totalMarketingVendas;
+  dre.percentualMargemContribuicao = dre.receitaLiquida > 0 ? dre.margemContribuicao / dre.receitaLiquida : 0;
+  
+  // ========== DESPESAS ADMINISTRATIVAS ==========
+  dre.despesasTimeAdm = config.despesasTimeAdm;
+  dre.despesasCustosAdm = config.despesasCustosAdm;
+  dre.despesasTech = config.despesasTech;
+  dre.despesasUtilities = config.despesasUtilities;
+  // Despesas de pessoas crescem R$ 1.750/mês
+  dre.despesasPessoas = config.despesasPessoasInicial + (idx * config.despesasPessoasIncremento);
+  dre.viagensAdmin = config.viagensAdmin;
+  dre.despesasSoftwares = config.despesasSoftwares;
+  dre.despesasServicosTerceirizados = config.despesasServicosTerceirizados;
+  
+  dre.totalDespesasAdm = 
+    dre.despesasTimeAdm + 
+    dre.despesasCustosAdm + 
+    dre.despesasTech + 
+    dre.despesasUtilities + 
+    dre.despesasPessoas + 
+    dre.viagensAdmin + 
+    dre.despesasSoftwares + 
+    dre.despesasServicosTerceirizados;
+  
+  // ========== EBITDA ==========
+  dre.ebitda = dre.margemContribuicao - dre.totalDespesasAdm;
+  dre.percentualEBITDA = dre.receitaLiquida > 0 ? dre.ebitda / dre.receitaLiquida : 0;
+  
+  // ========== EBIT ==========
+  dre.despesasFinanceiras = dre.receitaBrutaRecebida * config.despesasFinanceirasRate;
+  dre.receitasFinanceiras = 0; // Pode ser implementado futuramente (rendimento de caixa)
+  dre.ebit = dre.ebitda - dre.despesasFinanceiras + dre.receitasFinanceiras;
+  
+  // ========== LUCRO LÍQUIDO ==========
+  // IRPJ e CSLL zerados se EBIT negativo
+  dre.irpj = dre.ebit > 0 ? dre.ebit * config.irpjRate : 0;
+  dre.csll = dre.ebit > 0 ? dre.ebit * config.csllRate : 0;
+  dre.lucroLiquido = dre.ebit - dre.irpj - dre.csll;
+  dre.percentualLucroLiquido = dre.receitaLiquida > 0 ? dre.lucroLiquido / dre.receitaLiquida : 0;
+  
+  // ========== FLUXO DE CAIXA ==========
+  dre.lucroPeríodo = dre.lucroLiquido;
+  
+  // Contas a receber bookado (simplificado: 5% da receita won fica pendente)
+  dre.contasAReceberBookado = dre.revenue * 0.05;
+  dre.taxasRoyaltiesBookado = dre.contasAReceberBookado * (config.royaltiesRate + config.issRate + config.irrfRate + config.pisRate + config.cofinsRate);
+  
+  dre.depreciacao = config.depreciacao;
+  dre.caixaOperacional = dre.lucroPeríodo + dre.depreciacao - dre.contasAReceberBookado - dre.taxasRoyaltiesBookado;
+  
+  // Atividades de Investimento
+  dre.compraAtivoIntangivel = config.compraAtivoIntangivel;
+  dre.caixaInvestimento = -dre.compraAtivoIntangivel;
+  
+  // Atividades de Financiamento
+  dre.pagamentoFinanciamento = config.pagamentoFinanciamento;
+  dre.distribuicaoDividendos = config.distribuicaoDividendos;
+  dre.caixaFinanciamento = -dre.pagamentoFinanciamento - dre.distribuicaoDividendos;
+  
+  // Saldo de Caixa
+  dre.saldoCaixaMes = dre.caixaOperacional + dre.caixaInvestimento + dre.caixaFinanciamento;
+  dre.caixaInicial = caixaInicialMes;
+  dre.caixaFinal = dre.caixaInicial + dre.saldoCaixaMes;
+  
+  // ========== KPIS ==========
+  // CAC: Investimento / Clientes Won
+  dre.cac = totalWons > 0 ? dre.investimentoMarketing / totalWons : 0;
+  
+  // CLV: Valor médio por cliente × lifetime esperado (simplificado)
+  dre.quantidadeClientes = monthData.totalActiveClients;
+  const revenueMediaPorCliente = dre.quantidadeClientes > 0 ? dre.revenue / dre.quantidadeClientes : 0;
+  // Lifetime médio ponderado: 7 meses (Loyalty) + 2 meses (No-Loyalty) = ~4-5 meses médio
+  const lifetimeMedio = 5;
+  dre.clv = revenueMediaPorCliente * lifetimeMedio * dre.performanceConversao;
+  
+  // ROI
+  dre.roi = dre.cac > 0 ? (dre.clv / dre.cac) - 1 : 0;
+  
+  return dre;
 }
 
 export function formatCurrency(value: number): string {

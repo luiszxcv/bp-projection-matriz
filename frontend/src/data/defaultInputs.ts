@@ -201,29 +201,194 @@ export const defaultInputs: SimulationInputs = {
     },
   },
   capacityPlan: {
+    initialHCSaber: 3,      // HC inicial Saber: 3 pessoas já existentes
+    initialHCExecutar: 160, // HC inicial Executar: 160 pessoas já existentes (15 squads)
     saberSquad: {
       headcount: 9,
-      capacityUC: 25,
-      tierWeights: {
-        enterprise: 3.0,
-        large: 2.5,
-        medium: 2.0,
-        small: 1.5,
-        tiny: 1.0,
+      productiveHoursPerPerson: 144, // Horas produtivas por pessoa por mês
+      roleHours: {
+        // Baseado na tabela "Lógica de horas squad saber" do capacity-plan-hours.md
+        // Totais por cliente: Tiny≈40h, Small≈64h, Medium≈103h, Large≈126h, Enterprise≈150h (estimado)
+        'Coordenador': {
+          tiny: 4,      // Proporcional: ~62% de Small
+          small: 7,     // 5h rotina + 2h execução
+          medium: 16,   // 10h rotina + 6h execução
+          large: 25,    // 10h rotina + 15h execução
+          enterprise: 30, // Escalado proporcionalmente
+        },
+        'Account Jr.': {
+          tiny: 9,      // Proporcional: ~60% de Small
+          small: 15,    // 10h rotina + 5h execução
+          medium: 15,   // 10h rotina + 5h execução
+          large: 0,     // Não atende Large/Enterprise
+          enterprise: 0,
+        },
+        'Gestor de Tráfego Pl': {
+          tiny: 7,      // Proporcional
+          small: 12,    // 6h rotina + 6h execução
+          medium: 14,   // 6h rotina + 8h execução
+          large: 20,    // 10h rotina + 10h execução
+          enterprise: 24,
+        },
+        'Copywriter Sr.': {
+          tiny: 8,      // Proporcional
+          small: 14,    // 6h rotina + 8h execução
+          medium: 16,   // 6h rotina + 10h execução
+          large: 25,    // 10h rotina + 15h execução
+          enterprise: 30,
+        },
+        'Designer Jr.': {
+          tiny: 10,     // Proporcional
+          small: 16,    // 6h rotina + 10h execução
+          medium: 16,   // 6h rotina + 10h execução
+          large: 0,     // Não atende Large/Enterprise
+          enterprise: 0,
+        },
+        'Tech Pl.': {
+          tiny: 0,      // Não atende Tiny
+          small: 0,
+          medium: 10,   // 4h rotina + 6h execução
+          large: 16,    // 6h rotina + 10h execução
+          enterprise: 20,
+        },
+        'Sales Enablement Jr.': {
+          tiny: 0,      // Não atende Tiny/Small
+          small: 0,
+          medium: 16,   // 6h rotina + 10h execução
+          large: 20,    // 10h rotina + 10h execução
+          enterprise: 24,
+        },
+        'Account Pl.': {
+          tiny: 2,      // Adicional para todos os tiers
+          small: 0,
+          medium: 0,
+          large: 20,    // Suporte para Large/Enterprise
+          enterprise: 22,
+        },
       },
     },
     executarSquad: {
-      headcount: 15,
-      clientsPerSquad: 20, // Mantido para compatibilidade
-      capacityUC: 20,      // UC por squad Executar
-      tierWeights: {
-        enterprise: 2.5,
-        large: 2.0,
-        medium: 1.5,
-        small: 1.0,
-        tiny: 0.5,
+      headcount: 11, // Realidade: 10,6 pessoas/squad (160 pessoas ÷ 15 squads)
+      productiveHoursPerPerson: 144, // Horas mensais por pessoa (mesma base do Saber)
+      roleHours: {
+        // Horas ajustadas para bater realidade: 160 pessoas tocando R$ 2,1M (R$ 13k/pessoa)
+        // Total por cliente: Tiny=78h, Small=95h, Medium=112h, Large=134h, Enterprise=162h
+        'Coordenador': {
+          tiny: 8,
+          small: 9,
+          medium: 11,
+          large: 13,
+          enterprise: 16,
+        },
+        'Account': {
+          tiny: 15,
+          small: 19,
+          medium: 22,
+          large: 27,
+          enterprise: 32,
+        },
+        'Gestor de Tráfego': {
+          tiny: 18,
+          small: 22,
+          medium: 26,
+          large: 30,
+          enterprise: 37,
+        },
+        'Copywriter': {
+          tiny: 15,
+          small: 19,
+          medium: 22,
+          large: 27,
+          enterprise: 32,
+        },
+        'Designer': {
+          tiny: 18,
+          small: 22,
+          medium: 25,
+          large: 30,
+          enterprise: 37,
+        },
+        'Social': {
+          tiny: 4,
+          small: 4,
+          medium: 6,
+          large: 7,
+          enterprise: 8,
+        },
       },
     },
+  },
+  dreConfig: {
+    // Percentuais de dedução sobre Revenue
+    inadimplenciaRate: 0.04,              // 4%
+    churnM0FalconsRate: 0.03,             // 3%
+    churnRecebimentoOPSRate: 0.02,        // 2%
+    
+    // Tributos sobre Receita Bruta Recebida
+    royaltiesRate: 0.15,                  // 15%
+    issRate: 0.02,                        // 2%
+    irrfRate: 0.015,                      // 1.5%
+    pisRate: 0.0165,                      // 1.65%
+    cofinsRate: 0.0365,                   // 3.65%
+    
+    // CSP (Custo de Serviço Prestado) - Modelo baseado em Squad e Capacidade
+    // SQUAD EXECUTAR (9 pessoas, atende 20 clientes)
+    cspExecutarSquadMensal: 73000,        // R$ 73.000/squad/mês
+    cspExecutarCapacidadeClientes: 20,    // 20 clientes/squad
+    cspExecutarCoordenador: 14000,        // R$ 14.000
+    cspExecutarAccountSr: 6500,           // R$ 6.500 (conta 2x no total)
+    cspExecutarGestorTrafegoSr: 6500,     // R$ 6.500
+    cspExecutarGestorTrafegoPl: 6500,     // R$ 6.500
+    cspExecutarCopywriter: 5000,          // R$ 5.000
+    cspExecutarDesignerSr: 6000,          // R$ 6.000
+    cspExecutarDesignerPl: 4500,          // R$ 4.500
+    cspExecutarSocialMedia: 5000,         // R$ 5.000
+    
+    // SQUAD SABER (9 pessoas, atende 15 clientes)
+    cspSaberSquadMensal: 80238,           // R$ 80.238/squad/mês
+    cspSaberCapacidadeClientes: 15,       // 15 clientes/squad
+    cspSaberCoordenador: 20000,           // R$ 20.000
+    cspSaberAccountSr: 12500,             // R$ 12.500
+    cspSaberAccountJr: 5000,              // R$ 5.000
+    cspSaberGestorTrafegoPl: 10000,       // R$ 10.000
+    cspSaberCopywriter: 8000,             // R$ 8.000
+    cspSaberDesignerSr: 8000,             // R$ 8.000
+    cspSaberTech: 2738,                   // R$ 2.738 (part-time)
+    cspSaberAccountPl: 8000,              // R$ 8.000
+    cspSaberSalesEnablement: 6000,        // R$ 6.000
+    
+    // TER usa estrutura similar ao Saber
+    cspTerUsaSaberSquad: true,            // Ter usa a mesma estrutura de squad Saber
+    
+    // Despesas Marketing e Vendas
+    folhaGestaoComercial: 32500,          // R$ 32.500/mês
+    comissaoMediaPorCliente: 2500,        // R$ 2.500/cliente (média ponderada)
+    salarioCloser: 9000,                  // R$ 9.000/closer
+    salarioSDR: 4500,                     // R$ 4.500/SDR
+    despesasVisitas: 2000,                // R$ 2.000/mês
+    
+    // Despesas Administrativas (valores fixos mensais)
+    despesasTimeAdm: 174400,              // R$ 174.400
+    despesasCustosAdm: 9905,              // R$ 9.905
+    despesasTech: 36200,                  // R$ 36.200
+    despesasUtilities: 123350,            // R$ 123.350
+    despesasPessoasInicial: 73500,        // R$ 73.500 (mês 1)
+    despesasPessoasIncremento: 1750,      // R$ 1.750/mês (incremento mensal)
+    viagensAdmin: 10000,                  // R$ 10.000
+    despesasSoftwares: 21672.26,          // R$ 21.672,26
+    despesasServicosTerceirizados: 25246.50, // R$ 25.246,50
+    
+    // Financeiro
+    despesasFinanceirasRate: 0.019,       // 1.9% sobre Receita Bruta Recebida
+    irpjRate: 0.15,                       // 15% sobre EBIT
+    csllRate: 0.09,                       // 9% sobre EBIT
+    
+    // Fluxo de Caixa
+    depreciacao: 8740.71,                 // R$ 8.740,71/mês
+    compraAtivoIntangivel: 4985.21,       // R$ 4.985,21/mês
+    pagamentoFinanciamento: 11388.93,     // R$ 11.388,93/mês
+    distribuicaoDividendos: 150000,       // R$ 150.000/mês
+    caixaInicial: 1500000,                // R$ 1.500.000 (capital inicial)
   },
 };
 

@@ -4,12 +4,12 @@
 
 O Capacity Plan calcula quantas coordenações (squads) são necessárias para atender a base de clientes, dividido em dois tipos:
 
-1. **Coordenação SABER + TER** - Atende clientes dos produtos Saber e Ter
-2. **Coordenação EXECUTAR** - Atende clientes dos produtos Executar (Loyalty e No-Loyalty)
+1. **Coordenação SABER ** - Atende clientes dos produtos Saber
+2. **Coordenação EXECUTAR** - Atende clientes dos produtos Executar (Loyalty e No-Loyalty) e base legada
 
 ---
 
-## 1. Coordenação SABER + TER
+## 1. Coordenação SABER 
 
 ### 1.1 Composição da Squad (9 pessoas)
 | Qty | Cargo |
@@ -72,7 +72,7 @@ Uma squad SABER tem capacidade de:
 
 ### 1.7 Fórmula de Cálculo de Squads SABER
 ```
-Total UC Necessário = Σ (Clientes_Tier × Peso_Tier) para Saber + Ter
+Total UC Necessário = Σ (Clientes_Tier × Peso_Tier) para Saber 
 
 Squads SABER Necessárias = ceil(Total UC Necessário / 25)
 ```
@@ -118,7 +118,7 @@ Squads EXECUTAR Necessárias = ceil(Total Clientes Executar / 20)
 
 Para permitir ajustes, os seguintes parâmetros serão editáveis:
 
-### 3.1 Squad SABER + TER
+### 3.1 Squad SABER 
 ```typescript
 saberSquadConfig: {
   headcount: 9,                    // Total de pessoas na squad
@@ -268,7 +268,7 @@ A nova seção "CAPACITY PLAN" será adicionada após TOTAIS com:
    - Clientes por Squad Executar
 
 2. **Clientes Acumulados** (calculados)
-   - Clientes Saber + Ter por Tier
+   - Clientes Saber  por Tier
    - Clientes Executar Total
 
 3. **Resultado Capacity** (calculados)
@@ -319,7 +319,7 @@ E o número de players da coordenação será  decidida pela receita por cabeça
 1	Accoun Pl.
 1	Sales Enablement Jr.
 
-Modelo de distribuição de clientes para a squad do tipo 'saber + ter':
+Modelo de distribuição de clientes para a squad do tipo 'saber ':
 qty Tipo 'Receita mês'
 4	Tiny	R$ 80.000,00
 4	Small	R$ 120.000,00

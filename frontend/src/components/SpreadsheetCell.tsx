@@ -28,6 +28,7 @@ export function SpreadsheetCell({
 
   const formatValue = (val: number | string): string => {
     if (typeof val === 'string') return val;
+    if (isNaN(val) || val === null || val === undefined) return '0';
     
     switch (format) {
       case 'currency':
