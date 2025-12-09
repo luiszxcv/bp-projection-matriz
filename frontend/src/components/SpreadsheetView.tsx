@@ -4406,6 +4406,30 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 />
               </div>
 
+              <div className="flex row-hover">
+                <RowHeader label="CSP CSS e Web Products" className="pl-10" tooltip="Custos com CSS e produtos web" />
+                {monthlyData.map((m, i) => (
+                  <SpreadsheetCell key={i} value={getMonthlyValue(inputs.dreConfig.cspCssWebProducts, i)} format="currency" />
+                ))}
+                <SpreadsheetCell
+                  value={Array.from({ length: 12 }, (_, i) => getMonthlyValue(inputs.dreConfig.cspCssWebProducts, i)).reduce((sum, v) => sum + v, 0)}
+                  format="currency"
+                  className="bg-primary/10"
+                />
+              </div>
+
+              <div className="flex row-hover">
+                <RowHeader label="CSP Gerentes" className="pl-10" tooltip="Custos com gerentes (incluídos no CSP Total)" />
+                {monthlyData.map((m, i) => (
+                  <SpreadsheetCell key={i} value={getMonthlyValue(inputs.dreConfig.cspGerentes, i)} format="currency" />
+                ))}
+                <SpreadsheetCell
+                  value={Array.from({ length: 12 }, (_, i) => getMonthlyValue(inputs.dreConfig.cspGerentes, i)).reduce((sum, v) => sum + v, 0)}
+                  format="currency"
+                  className="bg-primary/10"
+                />
+              </div>
+
               {/* ========== MARGEM OPERACIONAL ========== */}
               <div className="flex row-hover bg-primary/10 mt-2">
                 <RowHeader label="(=) MARGEM OPERACIONAL" className="pl-6 font-semibold" />
