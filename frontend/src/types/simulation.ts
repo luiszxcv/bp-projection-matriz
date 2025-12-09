@@ -163,6 +163,12 @@ export interface CapacityPlanData {
   hiresSaber: number; // Contratações necessárias (Saber)
   hiresExecutar: number; // Contratações necessárias (Executar)
   totalHires: number; // Total de contratações
+  // Realocação interna (gap) - pessoas liberadas em Executar que podem ser realocadas para Saber
+  redeployableFromExecutar: number;
+  // Contratações Saber considerando realocação de Executar
+  hiresSaberWithRedeployment: number;
+  // Total de contratações considerando realocação interna
+  totalHiresWithRedeployment: number;
   // Métricas
   revenuePerHC: number;
   hoursUtilizationSaber: number; // % de utilização da capacidade Saber (horas)
@@ -175,8 +181,22 @@ export interface CapacityPlanData {
   salesHires?: number; // Contratações sugeridas para time de vendas
 }
 
+// Tracking de receita futura para visão DFC
+export interface PendingRevenueTracking {
+  tier: Tier;
+  product: 'executarLoyalty' | 'executarNoLoyalty';
+  source: 'acquisition' | 'conversion';           // Aquisição direta ou conversão Saber
+  monthlyAmount: number;                          // Valor mensal a receber
+  startMonth: number;                             // Mês inicial
+  remainingMonths: number;                        // Meses restantes
+  totalAmount: number;                            // Valor total
+}
+
 // DRE Configuration
 export interface DREConfig {
+  // Controle de visualização
+  usarLinhasGerenciais: boolean;    // Default: true - Se false, oculta e remove do cálculo as linhas gerenciais
+  
   // Percentuais de dedução sobre Revenue
   inadimplenciaRate: number;        // Default: 4%
   churnM0FalconsRate: number;       // Default: 3%
@@ -295,6 +315,14 @@ export interface DREData {
   expansionRevenue: number;               // Expansions
   legacyRevenue: number;                  // Base legada
   
+  // RECEITA DFC - Detalhamento por recebimento mensal
+  activationRevenueDFC: number;                    // Receita DFC total do mês
+  activationExecutarLoyaltyDFC: number;            // Executar Loyalty DFC (aquisição)
+  activationExecutarNoLoyaltyDFC: number;          // Executar No-Loyalty DFC (aquisição)
+  activationSaberConvLoyaltyDFC: number;           // Conversão Saber→Executar Loyalty DFC
+  activationSaberConvNoLoyaltyDFC: number;         // Conversão Saber→Executar No-Loyalty DFC
+  activationOutrosProdutos: number;                // Saber, Ter, Potencializar (sem mudança)
+  
   // DEDUÇÕES
   inadimplencia: number;
   churnM0Falcons: number;
@@ -374,6 +402,7 @@ export interface DREData {
   saldoCaixaMes: number;
   caixaInicial: number;
   caixaFinal: number;
+  caixaEfetivo: number;                   // Resumo: Lucro Líquido - Compra Ativo - Pagamento Financ - Dividendos
   
   // KPIs
   cac: number;                            // Customer Acquisition Cost

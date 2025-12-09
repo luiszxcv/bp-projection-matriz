@@ -346,6 +346,9 @@ export const defaultInputs: SimulationInputs = {
     despesasVisitasExpansion: 2000,       // R$ 2.000/mês
   },
   dreConfig: {
+    // Controle de visualização
+    usarLinhasGerenciais: false,           // true = mostra e calcula linhas gerenciais (inadimplência, churns, etc)
+    
     // Percentuais de dedução sobre Revenue
     inadimplenciaRate: 0.04,              // 4%
     churnM0FalconsRate: 0.00,             // 0% (quebra aplicada no funil)
@@ -427,7 +430,7 @@ export const defaultInputs: SimulationInputs = {
     despesasPessoasInicial: 73500,        // R$ 73.500 (mês 1)
     despesasPessoasIncremento: 1750,      // R$ 1.750/mês (incremento mensal)
     viagensAdmin: 10000,                  // R$ 10.000
-    despesasSoftwares: 21672.26,          // R$ 21.672,26
+    despesasSoftwares: 60000,             // R$ 60.000,00
     despesasServicosTerceirizados: 25246.50, // R$ 25.246,50
     
     // Financeiro

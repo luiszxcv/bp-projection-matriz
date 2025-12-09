@@ -1,4 +1,4 @@
-import { SimulationInputs, MonthlyData, Tier, ProductDistribution, TierDistribution, Product, CapacityPlanData, DREData, DREConfig, SalesMetrics } from '@/types/simulation';
+import { SimulationInputs, MonthlyData, Tier, ProductDistribution, TierDistribution, Product, CapacityPlanData, DREData, DREConfig, SalesMetrics, PendingRevenueTracking } from '@/types/simulation';
 
 const TIERS: Tier[] = ['enterprise', 'large', 'medium', 'small', 'tiny'];
 const PRODUCTS: Product[] = ['saber', 'ter', 'executarNoLoyalty', 'executarLoyalty', 'potencializar'];
@@ -52,6 +52,9 @@ const createEmptyCapacityPlanData = (): CapacityPlanData => ({
   hiresSaber: 0,
   hiresExecutar: 0,
   totalHires: 0,
+  redeployableFromExecutar: 0,
+  hiresSaberWithRedeployment: 0,
+  totalHiresWithRedeployment: 0,
   revenuePerHC: 0,
   hoursUtilizationSaber: 0,
   hoursUtilizationExecutar: 0,
@@ -64,6 +67,12 @@ const createEmptyDREData = (month: number): DREData => ({
   renewalRevenue: 0,
   expansionRevenue: 0,
   legacyRevenue: 0,
+  activationRevenueDFC: 0,
+  activationExecutarLoyaltyDFC: 0,
+  activationExecutarNoLoyaltyDFC: 0,
+  activationSaberConvLoyaltyDFC: 0,
+  activationSaberConvNoLoyaltyDFC: 0,
+  activationOutrosProdutos: 0,
   inadimplencia: 0,
   churnM0Falcons: 0,
   churnRecebimentoOPS: 0,
@@ -122,6 +131,7 @@ const createEmptyDREData = (month: number): DREData => ({
   saldoCaixaMes: 0,
   caixaInicial: 0,
   caixaFinal: 0,
+  caixaEfetivo: 0,
   cac: 0,
   clv: 0,
   roi: 0,
@@ -169,6 +179,9 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
     small: [],
     tiny: [],
   };
+  
+  // Track pending revenue for DFC view
+  let pendingDFCRevenue: PendingRevenueTracking[] = [];
   
   // Legacy base tracking
   let legacyClients = { ...inputs.legacyBase };
@@ -325,12 +338,40 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
         monthData.directActivations[tier][product] = activatedClients;
         monthData.activationBreakdown[tier][product] = breakdownAmount;
         
-        // Track for renewals
+        // Track for renewals and DFC
         if (product === 'saber' && activatedClients > 0) {
           pendingSaberConversions[tier].push({ clients: activatedClients, month });
         } else if (product === 'executarLoyalty' && activatedClients > 0) {
+          // Registrar para DFC tracking
+          const monthlyTicket = metrics.productTickets.executarLoyalty[idx];
+          const duration = inputs.conversionRates.loyaltyDuration; // 7 meses
+          
+          pendingDFCRevenue.push({
+            tier,
+            product: 'executarLoyalty',
+            source: 'acquisition',
+            monthlyAmount: activatedClients * monthlyTicket * revenueActivationRate,
+            startMonth: month,
+            remainingMonths: duration,
+            totalAmount: revenue
+          });
+          
           activeExecutarLoyalty[tier].push({ clients: activatedClients, month, renewals: 0 });
         } else if (product === 'executarNoLoyalty' && activatedClients > 0) {
+          // Registrar para DFC tracking
+          const monthlyTicket = metrics.productTickets.executarNoLoyalty[idx];
+          const duration = inputs.conversionRates.noLoyaltyDuration; // 2 meses
+          
+          pendingDFCRevenue.push({
+            tier,
+            product: 'executarNoLoyalty',
+            source: 'acquisition',
+            monthlyAmount: activatedClients * monthlyTicket * revenueActivationRate,
+            startMonth: month,
+            remainingMonths: duration,
+            totalAmount: revenue
+          });
+          
           activeExecutarNoLoyalty[tier].push({ clients: activatedClients, month, renewals: 0 });
         }
         
@@ -345,6 +386,7 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
     for (const tier of TIERS) {
       const conversionsToProcess = pendingSaberConversions[tier].filter(c => month - c.month >= 2);
       const metrics = inputs.tierMetrics[tier];
+      const revenueActivationRate = metrics.revenueActivationRate[idx];
       
       for (const conv of conversionsToProcess) {
         const convertingClients = Math.round(conv.clients * inputs.conversionRates.saberToExecutar);
@@ -357,17 +399,47 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
         
         // Calcular receita da conversão
         if (loyaltyClients > 0) {
-          const loyaltyRevenue = loyaltyClients * metrics.productTickets.executarLoyalty[idx] * inputs.conversionRates.loyaltyDuration;
+          const monthlyTicket = metrics.productTickets.executarLoyalty[idx];
+          const duration = inputs.conversionRates.loyaltyDuration;
+          const loyaltyRevenue = loyaltyClients * monthlyTicket * duration;
+          
           monthData.revenueByTierProduct[tier].executarLoyalty += loyaltyRevenue;
           monthData.activeClients[tier].executarLoyalty += loyaltyClients;
           monthData.totalNewRevenue += loyaltyRevenue;
+          
+          // Registrar conversão Loyalty para DFC
+          pendingDFCRevenue.push({
+            tier,
+            product: 'executarLoyalty',
+            source: 'conversion',
+            monthlyAmount: loyaltyClients * monthlyTicket * revenueActivationRate,
+            startMonth: month,
+            remainingMonths: duration,
+            totalAmount: loyaltyRevenue
+          });
+          
           activeExecutarLoyalty[tier].push({ clients: loyaltyClients, month, renewals: 0 });
         }
         if (noLoyaltyClients > 0) {
-          const noLoyaltyRevenue = noLoyaltyClients * metrics.productTickets.executarNoLoyalty[idx] * inputs.conversionRates.noLoyaltyDuration;
+          const monthlyTicket = metrics.productTickets.executarNoLoyalty[idx];
+          const duration = inputs.conversionRates.noLoyaltyDuration;
+          const noLoyaltyRevenue = noLoyaltyClients * monthlyTicket * duration;
+          
           monthData.revenueByTierProduct[tier].executarNoLoyalty += noLoyaltyRevenue;
           monthData.activeClients[tier].executarNoLoyalty += noLoyaltyClients;
           monthData.totalNewRevenue += noLoyaltyRevenue;
+          
+          // Registrar conversão No-Loyalty para DFC
+          pendingDFCRevenue.push({
+            tier,
+            product: 'executarNoLoyalty',
+            source: 'conversion',
+            monthlyAmount: noLoyaltyClients * monthlyTicket * revenueActivationRate,
+            startMonth: month,
+            remainingMonths: duration,
+            totalAmount: noLoyaltyRevenue
+          });
+          
           activeExecutarNoLoyalty[tier].push({ clients: noLoyaltyClients, month, renewals: 0 });
         }
       }
@@ -606,15 +678,28 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
     monthData.capacityPlan.turnoverSaber = Math.round(prevHCSaber * turnoverRate);
     monthData.capacityPlan.turnoverExecutar = Math.round(prevHCExecutar * turnoverRate);
     monthData.capacityPlan.totalTurnover = monthData.capacityPlan.turnoverSaber + monthData.capacityPlan.turnoverExecutar;
-    
+
     // Contratações = (HC necessário - HC anterior) + reposição de turnover
     // Isso garante que consideramos o HC inicial no mês 1
     const hcGrowthSaber = monthData.capacityPlan.hcSaber - prevHCSaber;
     const hcGrowthExecutar = monthData.capacityPlan.hcExecutar - prevHCExecutar;
-    
+
+    // Contratações sem considerar realocação interna
     monthData.capacityPlan.hiresSaber = Math.max(0, hcGrowthSaber + monthData.capacityPlan.turnoverSaber);
     monthData.capacityPlan.hiresExecutar = Math.max(0, hcGrowthExecutar + monthData.capacityPlan.turnoverExecutar);
     monthData.capacityPlan.totalHires = monthData.capacityPlan.hiresSaber + monthData.capacityPlan.hiresExecutar;
+
+    // === NOVO: Calcular gap / potencial de realocação de Executar para Saber ===
+    // Pessoas disponíveis para realocação = pessoas que permanecem (prevHC - turnover) menos o HC agora requerido
+    const remainingAfterTurnoverExecutar = Math.max(0, prevHCExecutar - monthData.capacityPlan.turnoverExecutar);
+    const redeployableFromExecutar = Math.max(0, remainingAfterTurnoverExecutar - monthData.capacityPlan.hcExecutar);
+    monthData.capacityPlan.redeployableFromExecutar = redeployableFromExecutar;
+
+    // Contratações Saber considerando realocação (usamos o pool de Executar antes de contratar)
+    monthData.capacityPlan.hiresSaberWithRedeployment = Math.max(0, hcGrowthSaber + monthData.capacityPlan.turnoverSaber - redeployableFromExecutar);
+
+    // Total de contratações considerando realocação interna (aplica redução apenas ao Saber)
+    monthData.capacityPlan.totalHiresWithRedeployment = monthData.capacityPlan.hiresSaberWithRedeployment + monthData.capacityPlan.hiresExecutar;
 
     // ===== Sales sizing guidance (SDR / Closers) - não contam no totalHC =====
     // Regras: 200 MQL por SDR, 50 SAL por Closer
@@ -734,18 +819,68 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
   // Calcular DRE para cada mês
   let caixaAcumulado = inputs.dreConfig.caixaInicial;
   for (let i = 0; i < months.length; i++) {
-    months[i].dre = calculateDRE(months[i], inputs, caixaAcumulado);
+    months[i].dre = calculateDRE(months[i], inputs, caixaAcumulado, pendingDFCRevenue);
     caixaAcumulado = months[i].dre.caixaFinal;
   }
   
   return months;
 }
 
+/**
+ * Calcula a receita DFC (recebimento mensal) para um mês específico
+ * baseado no tracking de receitas futuras
+ */
+function calculateDFCRevenueForMonth(
+  month: number,
+  pendingRevenues: PendingRevenueTracking[]
+): {
+  dfcTotal: number;
+  executarLoyaltyAcq: number;
+  executarNoLoyaltyAcq: number;
+  executarLoyaltyConv: number;
+  executarNoLoyaltyConv: number;
+} {
+  let executarLoyaltyAcq = 0;
+  let executarNoLoyaltyAcq = 0;
+  let executarLoyaltyConv = 0;
+  let executarNoLoyaltyConv = 0;
+  
+  // Percorrer todas as receitas pendentes
+  for (const pending of pendingRevenues) {
+    const monthsElapsed = month - pending.startMonth;
+    
+    // Se este mês está dentro do período de recebimento
+    if (monthsElapsed >= 0 && monthsElapsed < pending.remainingMonths) {
+      if (pending.product === 'executarLoyalty' && pending.source === 'acquisition') {
+        executarLoyaltyAcq += pending.monthlyAmount;
+      } else if (pending.product === 'executarNoLoyalty' && pending.source === 'acquisition') {
+        executarNoLoyaltyAcq += pending.monthlyAmount;
+      } else if (pending.product === 'executarLoyalty' && pending.source === 'conversion') {
+        executarLoyaltyConv += pending.monthlyAmount;
+      } else if (pending.product === 'executarNoLoyalty' && pending.source === 'conversion') {
+        executarNoLoyaltyConv += pending.monthlyAmount;
+      }
+    }
+  }
+  
+  const dfcTotal = executarLoyaltyAcq + executarNoLoyaltyAcq + 
+                   executarLoyaltyConv + executarNoLoyaltyConv;
+  
+  return {
+    dfcTotal,
+    executarLoyaltyAcq,
+    executarNoLoyaltyAcq,
+    executarLoyaltyConv,
+    executarNoLoyaltyConv
+  };
+}
+
 // Função auxiliar para calcular DRE de um mês
 function calculateDRE(
   monthData: MonthlyData,
   inputs: SimulationInputs,
-  caixaInicialMes: number
+  caixaInicialMes: number,
+  pendingDFCRevenue: PendingRevenueTracking[]
 ): DREData {
   const config = inputs.dreConfig;
   const dre = createEmptyDREData(monthData.month);
@@ -758,18 +893,70 @@ function calculateDRE(
   
   
   // ========== RECEITA ==========
-  dre.revenue = monthData.totalRevenue;
-  dre.activationRevenue = monthData.totalNewRevenue;
-  dre.renewalRevenue = monthData.totalRenewalRevenue;
-  dre.expansionRevenue = monthData.totalExpansionRevenue;
-  dre.legacyRevenue = monthData.totalLegacyRevenue;
+  // Se usarLinhasGerenciais = true, usar DFC para Executar
+  // Se false, usar competência total
+  if (config.usarLinhasGerenciais) {
+    // Calcular DFC para este mês
+    const dfcData = calculateDFCRevenueForMonth(monthData.month, pendingDFCRevenue);
+    
+    // Receita de outros produtos (Saber, Ter, Potencializar) - sem mudança
+    dre.activationOutrosProdutos = TIERS.reduce((sum, tier) => {
+      return sum + 
+        monthData.revenueByTierProduct[tier].saber +
+        monthData.revenueByTierProduct[tier].ter +
+        monthData.revenueByTierProduct[tier].potencializar;
+    }, 0);
+    
+    // Receita DFC detalhada
+    dre.activationExecutarLoyaltyDFC = dfcData.executarLoyaltyAcq;
+    dre.activationExecutarNoLoyaltyDFC = dfcData.executarNoLoyaltyAcq;
+    dre.activationSaberConvLoyaltyDFC = dfcData.executarLoyaltyConv;
+    dre.activationSaberConvNoLoyaltyDFC = dfcData.executarNoLoyaltyConv;
+    dre.activationRevenueDFC = dfcData.dfcTotal;
+    
+    // Activation total = DFC + outros produtos
+    dre.activationRevenue = dre.activationRevenueDFC + dre.activationOutrosProdutos;
+    
+    // Outras receitas
+    dre.renewalRevenue = monthData.totalRenewalRevenue;
+    dre.expansionRevenue = monthData.totalExpansionRevenue;
+    dre.legacyRevenue = monthData.totalLegacyRevenue;
+    
+    // Revenue total = Activation DFC + Renewals + Expansions + Legacy
+    dre.revenue = dre.activationRevenue + dre.renewalRevenue + dre.expansionRevenue + dre.legacyRevenue;
+  } else {
+    // Visão de competência (atual)
+    dre.activationRevenue = monthData.totalNewRevenue;
+    dre.renewalRevenue = monthData.totalRenewalRevenue;
+    dre.expansionRevenue = monthData.totalExpansionRevenue;
+    dre.legacyRevenue = monthData.totalLegacyRevenue;
+    dre.revenue = monthData.totalRevenue;
+    
+    // Zerar campos DFC
+    dre.activationRevenueDFC = 0;
+    dre.activationExecutarLoyaltyDFC = 0;
+    dre.activationExecutarNoLoyaltyDFC = 0;
+    dre.activationSaberConvLoyaltyDFC = 0;
+    dre.activationSaberConvNoLoyaltyDFC = 0;
+    dre.activationOutrosProdutos = 0;
+  }
   
-  // ========== DEDUÇÕES ==========
-  dre.inadimplencia = dre.revenue * config.inadimplenciaRate;
-  dre.churnM0Falcons = dre.revenue * config.churnM0FalconsRate;
-  dre.churnRecebimentoOPS = dre.revenue * config.churnRecebimentoOPSRate;
-  dre.performanceConversao = 1 - (config.inadimplenciaRate + config.churnM0FalconsRate + config.churnRecebimentoOPSRate);
-  dre.receitaBrutaRecebida = dre.revenue - dre.inadimplencia - dre.churnM0Falcons - dre.churnRecebimentoOPS;
+  // ========== DEDUCÕES ==========
+  // Linhas gerenciais só são aplicadas se usarLinhasGerenciais = true
+  if (config.usarLinhasGerenciais) {
+    dre.inadimplencia = dre.revenue * config.inadimplenciaRate;
+    dre.churnM0Falcons = dre.revenue * config.churnM0FalconsRate;
+    dre.churnRecebimentoOPS = dre.revenue * config.churnRecebimentoOPSRate;
+    dre.performanceConversao = 1 - (config.inadimplenciaRate + config.churnM0FalconsRate + config.churnRecebimentoOPSRate);
+    dre.receitaBrutaRecebida = dre.revenue - dre.inadimplencia - dre.churnM0Falcons - dre.churnRecebimentoOPS;
+  } else {
+    // Quando desabilitado, não aplica deduções gerenciais
+    dre.inadimplencia = 0;
+    dre.churnM0Falcons = 0;
+    dre.churnRecebimentoOPS = 0;
+    dre.performanceConversao = 1;
+    dre.receitaBrutaRecebida = dre.revenue;
+  }
   
   // ========== TRIBUTOS ==========
   dre.royalties = dre.receitaBrutaRecebida * config.royaltiesRate;
@@ -884,6 +1071,10 @@ function calculateDRE(
   dre.csll = dre.ebit > 0 ? dre.ebit * config.csllRate : 0;
   dre.lucroLiquido = dre.ebit - dre.irpj - dre.csll;
   dre.percentualLucroLiquido = dre.receitaLiquida > 0 ? dre.lucroLiquido / dre.receitaLiquida : 0;
+  
+  // ========== CAIXA EFETIVO (Resumo) ==========
+  // Caixa Efetivo = Lucro Líquido - Compra Ativo Intangível - Pagamento Financiamento - Distribuição Dividendos
+  dre.caixaEfetivo = dre.lucroLiquido - config.compraAtivoIntangivel - config.pagamentoFinanciamento - config.distribuicaoDividendos;
   
   // ========== FLUXO DE CAIXA ==========
   dre.lucroPeríodo = dre.lucroLiquido;
