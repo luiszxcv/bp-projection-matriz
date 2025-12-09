@@ -938,24 +938,24 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                   </div>
                   
                   {/* Activation Breakdown - results */}
-                  <div className="flex row-hover bg-red-50/50">
+                  <div className="flex row-hover bg-destructive/10">
                     <RowHeader 
                       label={`(-) Quebra Ativação ${PRODUCT_LABELS[product]}`} 
                       tooltip="Valor debitado pela taxa de ativação (7% não ativados)"
-                      className="pl-8 text-red-600" 
+                      className="pl-8 text-destructive font-semibold" 
                     />
                     {monthlyData.map((m, i) => (
                       <SpreadsheetCell
                         key={i}
                         value={-m.activationBreakdown[tier][product]}
                         format="currency"
-                        className="text-red-600"
+                        className="text-destructive"
                       />
                     ))}
                     <SpreadsheetCell
                       value={-monthlyData.reduce((sum, m) => sum + m.activationBreakdown[tier][product], 0)}
                       format="currency"
-                      className="bg-primary/10 font-semibold text-red-600"
+                      className="bg-destructive/20 font-semibold text-destructive"
                     />
                   </div>
                   </>
@@ -4240,12 +4240,12 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
               ) : (
                 <>
                   {/* Visão de Competência (original) */}
-                  <div className="flex row-hover">
-                    <RowHeader label="📈 Visão Competência (Total no Mês)" className="pl-8 text-xs italic text-green-600" tooltip="Receita total bookada no mês de venda" />
+                  <div className="flex row-hover bg-black">
+                    <RowHeader label="📈 Visão Competência (Total no Mês)" className="pl-8 text-xs italic text-white" tooltip="Receita total bookada no mês de venda" />
                     {[...Array(12)].map((_, i) => (
-                      <div key={i} className="spreadsheet-cell bg-slate-50" />
+                      <div key={i} className="spreadsheet-cell bg-black text-white" />
                     ))}
-                    <div className="spreadsheet-cell bg-slate-100" />
+                    <div className="spreadsheet-cell bg-black text-white" />
                   </div>
                   
                   <div className="flex row-hover">
