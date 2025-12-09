@@ -165,15 +165,16 @@ export const defaultInputs: SimulationInputs = {
     loyaltyMaxRenewals: 2,
     noLoyaltyDuration: 2,
     noLoyaltyRenewalRate: 0.85,
-    noLoyaltyMaxRenewals: 5,
+    noLoyaltyMaxRenewals: 4,
     expansionRate: 0.04,
   },
   legacyBase: {
-    enterprise: { revenue: 329176.85, clients: 13 },
-    large: { revenue: 351936, clients: 23 },
-    medium: { revenue: 854159.25, clients: 98 },
-    small: { revenue: 242719.38, clients: 40 },
-    tiny: { revenue: 211102.04, clients: 42 },
+    // Ajuste para que a Receita Base Legada mensal totalize aproximadamente R$ 2.100.000
+    enterprise: { revenue: 333122.86, clients: 13 },
+    large: { revenue: 356152.88, clients: 23 },
+    medium: { revenue: 864394.52, clients: 99 },
+    small: { revenue: 332742.16, clients: 53 },
+    tiny: { revenue: 213587.58, clients: 43 },
     churnRate: 0.07,
     expansionRate: 0.04,
   },
@@ -272,41 +273,41 @@ export const defaultInputs: SimulationInputs = {
       productiveHoursPerPerson: 144, // Horas mensais por pessoa (mesma base do Saber)
       roleHours: {
         // Horas ajustadas para bater realidade: 160 pessoas tocando R$ 2,1M (R$ 13k/pessoa)
-        // Total por cliente: Tiny=78h, Small=95h, Medium=112h, Large=134h, Enterprise=162h
+        // Total por cliente (ajustado para reduzir squads de 16 → 15):
         'Coordenador': {
           tiny: 8,
-          small: 9,
-          medium: 11,
-          large: 13,
-          enterprise: 16,
+          small: 8,
+          medium: 10,
+          large: 12,
+          enterprise: 15,
         },
         'Account': {
-          tiny: 15,
-          small: 19,
-          medium: 22,
-          large: 27,
-          enterprise: 32,
+          tiny: 14,
+          small: 18,
+          medium: 21,
+          large: 25,
+          enterprise: 30,
         },
         'Gestor de Tráfego': {
-          tiny: 18,
-          small: 22,
-          medium: 26,
-          large: 30,
-          enterprise: 37,
+          tiny: 17,
+          small: 21,
+          medium: 24,
+          large: 28,
+          enterprise: 35,
         },
         'Copywriter': {
-          tiny: 15,
-          small: 19,
-          medium: 22,
-          large: 27,
-          enterprise: 32,
+          tiny: 14,
+          small: 18,
+          medium: 21,
+          large: 25,
+          enterprise: 30,
         },
         'Designer': {
-          tiny: 18,
-          small: 22,
-          medium: 25,
-          large: 30,
-          enterprise: 37,
+          tiny: 17,
+          small: 21,
+          medium: 23,
+          large: 28,
+          enterprise: 35,
         },
         'Social': {
           tiny: 4,
@@ -318,10 +319,36 @@ export const defaultInputs: SimulationInputs = {
       },
     },
   },
+  salesConfig: {
+    // Comissões (%)
+    comissaoActivationRate: 0.05,         // 5%
+    comissaoExpansionRate: 0.05,          // 5%
+    
+    // Remuneração Closers
+    closerProductivity: 10,               // 10 WONs/mês/closer
+    closerSalary: 5000,                   // R$ 5.000/mês
+    
+    // Remuneração SDRs
+    sdrProductivity: 80,                  // 80 SQLs/mês/SDR
+    sdrSalary: 3250,                      // R$ 3.250/mês
+    
+    // Remuneração Farmers
+    farmerProductivity: 100,              // 100 clientes/farmer
+    farmerSalary: 7000,                   // R$ 7.000/mês
+    
+    // Despesas Fixas Mensais
+    folhaGestaoComercial: 32500,          // R$ 32.500/mês
+    bonusCampanhasActivation: 8000,       // R$ 8.000/mês
+    estruturaSuporte: [3500, 3500, 8500, 8500, 8500, 8500, 8500, 8500, 8500, 8500, 8500, 8500], // Variável por mês
+    despesasVisitasActivation: 5000,      // R$ 5.000/mês
+    bonusCampanhasExpansion: 1500,        // R$ 1.500/mês
+    comissaoOperacao: 8000,               // R$ 8.000/mês
+    despesasVisitasExpansion: 2000,       // R$ 2.000/mês
+  },
   dreConfig: {
     // Percentuais de dedução sobre Revenue
     inadimplenciaRate: 0.04,              // 4%
-    churnM0FalconsRate: 0.03,             // 3%
+    churnM0FalconsRate: 0.00,             // 0% (quebra aplicada no funil)
     churnRecebimentoOPSRate: 0.02,        // 2%
     
     // Tributos sobre Receita Bruta Recebida
@@ -333,29 +360,54 @@ export const defaultInputs: SimulationInputs = {
     
     // CSP (Custo de Serviço Prestado) - Modelo baseado em Squad e Capacidade
     // SQUAD EXECUTAR (9 pessoas, atende 20 clientes)
+    // Observação: valores ajustados com rampa trimestral crescente.
+    // Rampa: Q1=80% (início), Q2≈86.67%, Q3≈93.33%, Q4=100% (meta Dez/2025).
+    // Esses são valores padrão editáveis — as fórmulas não foram alteradas.
     cspExecutarSquadMensal: 73000,        // R$ 73.000/squad/mês
     cspExecutarCapacidadeClientes: 20,    // 20 clientes/squad
-    cspExecutarCoordenador: 14000,        // R$ 14.000
-    cspExecutarAccountSr: 6500,           // R$ 6.500 (conta 2x no total)
-    cspExecutarGestorTrafegoSr: 6500,     // R$ 6.500
-    cspExecutarGestorTrafegoPl: 6500,     // R$ 6.500
-    cspExecutarCopywriter: 5000,          // R$ 5.000
-    cspExecutarDesignerSr: 6000,          // R$ 6.000
-    cspExecutarDesignerPl: 4500,          // R$ 4.500
-    cspExecutarSocialMedia: 5000,         // R$ 5.000
+    // Rampa: Q1=11200, Q2=12100, Q3=13100, Q4=14000 (meta)
+    cspExecutarCoordenador: [11200, 11200, 11200, 12100, 12100, 12100, 13100, 13100, 13100, 14000, 14000, 14000],
+    // Rampa: Q1=5200, Q2=5600, Q3=6100, Q4=6500 (meta)
+    cspExecutarAccountSr: [5200, 5200, 5200, 5600, 5600, 5600, 6100, 6100, 6100, 6500, 6500, 6500],
+    cspExecutarGestorTrafegoSr: [5200, 5200, 5200, 5600, 5600, 5600, 6100, 6100, 6100, 6500, 6500, 6500],
+    cspExecutarGestorTrafegoPl: [5200, 5200, 5200, 5600, 5600, 5600, 6100, 6100, 6100, 6500, 6500, 6500],
+    // Rampa: Q1=4000, Q2=4300, Q3=4700, Q4=5000 (meta)
+    cspExecutarCopywriter: [4000, 4000, 4000, 4300, 4300, 4300, 4700, 4700, 4700, 5000, 5000, 5000],
+    // Rampa: Q1=4800, Q2=5200, Q3=5600, Q4=6000 (meta)
+    cspExecutarDesignerSr: [4800, 4800, 4800, 5200, 5200, 5200, 5600, 5600, 5600, 6000, 6000, 6000],
+    // Rampa: Q1=3600, Q2=3900, Q3=4200, Q4=4500 (meta)
+    cspExecutarDesignerPl: [3600, 3600, 3600, 3900, 3900, 3900, 4200, 4200, 4200, 4500, 4500, 4500],
+    // Rampa: Q1=4000, Q2=4300, Q3=4700, Q4=5000 (meta)
+    cspExecutarSocialMedia: [4000, 4000, 4000, 4300, 4300, 4300, 4700, 4700, 4700, 5000, 5000, 5000],
     
     // SQUAD SABER (9 pessoas, atende 15 clientes)
+    // Observação: valores ajustados com rampa trimestral crescente.
+    // Rampa: Q1=80% (início), Q2≈86.67%, Q3≈93.33%, Q4=100% (meta Dez/2025).
+    // Esses são valores padrão editáveis — as fórmulas não foram alteradas.
     cspSaberSquadMensal: 80238,           // R$ 80.238/squad/mês
     cspSaberCapacidadeClientes: 15,       // 15 clientes/squad
-    cspSaberCoordenador: 20000,           // R$ 20.000
-    cspSaberAccountSr: 12500,             // R$ 12.500
-    cspSaberAccountJr: 5000,              // R$ 5.000
-    cspSaberGestorTrafegoPl: 10000,       // R$ 10.000
-    cspSaberCopywriter: 8000,             // R$ 8.000
-    cspSaberDesignerSr: 8000,             // R$ 8.000
-    cspSaberTech: 2738,                   // R$ 2.738 (part-time)
-    cspSaberAccountPl: 8000,              // R$ 8.000
-    cspSaberSalesEnablement: 6000,        // R$ 6.000
+    // Rampa: Q1=16000, Q2=17300, Q3=18700, Q4=20000 (meta)
+    cspSaberCoordenador: [16000, 16000, 16000, 17300, 17300, 17300, 18700, 18700, 18700, 20000, 20000, 20000],
+    // Rampa: Q1=10000, Q2=10800, Q3=11700, Q4=12500 (meta)
+    cspSaberAccountSr: [10000, 10000, 10000, 10800, 10800, 10800, 11700, 11700, 11700, 12500, 12500, 12500],
+    // Rampa: Q1=4000, Q2=4300, Q3=4700, Q4=5000 (meta)
+    cspSaberAccountJr: [4000, 4000, 4000, 4300, 4300, 4300, 4700, 4700, 4700, 5000, 5000, 5000],
+    // Rampa: Q1=8000, Q2=8700, Q3=9300, Q4=10000 (meta)
+    cspSaberGestorTrafegoPl: [8000, 8000, 8000, 8700, 8700, 8700, 9300, 9300, 9300, 10000, 10000, 10000],
+    // Rampa: Q1=6400, Q2=6900, Q3=7500, Q4=8000 (meta)
+    cspSaberCopywriter: [6400, 6400, 6400, 6900, 6900, 6900, 7500, 7500, 7500, 8000, 8000, 8000],
+    cspSaberDesignerSr: [6400, 6400, 6400, 6900, 6900, 6900, 7500, 7500, 7500, 8000, 8000, 8000],
+    // Rampa: Q1=2200, Q2=2400, Q3=2600, Q4=2738 (meta arredondado)
+    cspSaberTech: [2200, 2200, 2200, 2400, 2400, 2400, 2600, 2600, 2600, 2738, 2738, 2738],
+    // Rampa: Q1=6400, Q2=6900, Q3=7500, Q4=8000 (meta)
+    cspSaberAccountPl: [6400, 6400, 6400, 6900, 6900, 6900, 7500, 7500, 7500, 8000, 8000, 8000],
+    // Rampa: Q1=4800, Q2=5200, Q3=5600, Q4=6000 (meta)
+    cspSaberSalesEnablement: [4800, 4800, 4800, 5200, 5200, 5200, 5600, 5600, 5600, 6000, 6000, 6000],
+    
+    // Outros CSP
+    cspCssWebProducts: 23000,             // Fixo em R$ 23k/mês
+    // Rampa: Q1=60k, Q2=70k, Q3=80k, Q4=90k
+    cspGerentes: [60000, 60000, 60000, 70000, 70000, 70000, 80000, 80000, 80000, 90000, 90000, 90000],
     
     // TER usa estrutura similar ao Saber
     cspTerUsaSaberSquad: true,            // Ter usa a mesma estrutura de squad Saber

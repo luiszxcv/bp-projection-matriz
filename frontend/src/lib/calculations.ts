@@ -1,7 +1,12 @@
-import { SimulationInputs, MonthlyData, Tier, ProductDistribution, TierDistribution, Product, CapacityPlanData, DREData, DREConfig } from '@/types/simulation';
+import { SimulationInputs, MonthlyData, Tier, ProductDistribution, TierDistribution, Product, CapacityPlanData, DREData, DREConfig, SalesMetrics } from '@/types/simulation';
 
 const TIERS: Tier[] = ['enterprise', 'large', 'medium', 'small', 'tiny'];
 const PRODUCTS: Product[] = ['saber', 'ter', 'executarNoLoyalty', 'executarLoyalty', 'potencializar'];
+
+// Helper: get value from number or array (for monthly CSP salaries with ramp)
+const getMonthlyValue = (value: number | number[], monthIndex: number): number => {
+  return Array.isArray(value) ? value[monthIndex] : value;
+};
 
 const createEmptyTierDistribution = (): TierDistribution => ({
   enterprise: 0,
@@ -82,13 +87,7 @@ const createEmptyDREData = (month: number): DREData => ({
   percentualCSP: 0,
   margemOperacional: 0,
   percentualMargemOperacional: 0,
-  investimentoMarketing: 0,
-  folhaGestaoComercial: 0,
-  despesaComercialActivation: 0,
-  comissoes: 0,
-  remuneracaoCloser: 0,
-  remuneracaoSDR: 0,
-  despesasVisitas: 0,
+  salesMetrics: {} as SalesMetrics, // Será calculado depois
   totalMarketingVendas: 0,
   margemContribuicao: 0,
   percentualMargemContribuicao: 0,
@@ -173,7 +172,11 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
   
   // Legacy base tracking
   let legacyClients = { ...inputs.legacyBase };
+  // Sales running headcount (contratações persistem entre meses)
+  let runningSDR = inputs.dreConfig.currentSDR ?? 1;
+  let runningClosers = inputs.dreConfig.currentClosers ?? 2;
   
+
   for (let month = 1; month <= 12; month++) {
     const idx = month - 1;
     const monthData: MonthlyData = {
@@ -186,7 +189,9 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       revenueByTierProduct: createEmptyTierProductRecord(),
       activeClients: createEmptyTierProductRecord(),
       directActivations: createEmptyTierProductRecord(),
+      activationBreakdown: createEmptyTierProductRecord(),
       legacyClients: createEmptyTierDistribution(),
+      legacyRevenueBeforeChurn: createEmptyTierDistribution(),
       legacyRevenue: createEmptyTierDistribution(),
       legacyExpansionRevenue: createEmptyTierDistribution(),
       legacyExpansionByProduct: createEmptyTierProductRecord(),
@@ -207,9 +212,12 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       totalRenewalRevenue: 0,
       totalExpansionRevenue: 0,
       totalLegacyRevenue: 0,
+      totalLegacyRenewalRevenue: 0,
+      totalLegacyExpansionRevenue: 0,
       totalRevenue: 0,
       totalActiveClients: 0,
       capacityPlan: createEmptyCapacityPlanData(),
+      dre: {} as any, // Será preenchido posteriormente
     };
     
     // Get monthly values
@@ -291,22 +299,31 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
         
         totalDistributedActivations += activatedClients;
         
-        // Calcular receita: Executar usa ticket mensal × duração do contrato
+        // Calcular receita: todos os produtos aplicam revenueActivationRate
         let revenue: number;
+        let revenueWithoutBreakdown: number;
+        
         if (product === 'executarNoLoyalty') {
-          // NoLoyalty: ticket mensal × 2 meses (sem revenueActivationRate - já aplicado nos clientes)
-          revenue = activatedClients * ticket * inputs.conversionRates.noLoyaltyDuration;
+          // NoLoyalty: ticket mensal × 2 meses × revenueActivationRate (93%)
+          revenueWithoutBreakdown = activatedClients * ticket * inputs.conversionRates.noLoyaltyDuration;
+          revenue = revenueWithoutBreakdown * revenueActivationRate;
         } else if (product === 'executarLoyalty') {
-          // Loyalty: ticket mensal × 7 meses (sem revenueActivationRate - já aplicado nos clientes)
-          revenue = activatedClients * ticket * inputs.conversionRates.loyaltyDuration;
+          // Loyalty: ticket mensal × 7 meses × revenueActivationRate (93%)
+          revenueWithoutBreakdown = activatedClients * ticket * inputs.conversionRates.loyaltyDuration;
+          revenue = revenueWithoutBreakdown * revenueActivationRate;
         } else {
-          // Outros produtos (Saber, Ter, Potencializar): ticket direto
-          revenue = activatedClients * ticket * revenueActivationRate;
+          // Outros produtos (Saber, Ter, Potencializar): ticket direto × revenueActivationRate
+          revenueWithoutBreakdown = activatedClients * ticket;
+          revenue = revenueWithoutBreakdown * revenueActivationRate;
         }
+        
+        // Calcular valor debitado pela quebra de ativação
+        const breakdownAmount = revenueWithoutBreakdown - revenue;
         
         monthData.revenueByTierProduct[tier][product] = revenue;
         monthData.activeClients[tier][product] = activatedClients;
         monthData.directActivations[tier][product] = activatedClients;
+        monthData.activationBreakdown[tier][product] = breakdownAmount;
         
         // Track for renewals
         if (product === 'saber' && activatedClients > 0) {
@@ -446,6 +463,9 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
     for (const tier of TIERS) {
       const tierLegacy = legacyClients[tier];
       
+      // Store revenue before churn
+      monthData.legacyRevenueBeforeChurn[tier] = tierLegacy.revenue;
+      
       // Apply churn
       const remainingClients = Math.round(tierLegacy.clients * (1 - inputs.legacyBase.churnRate));
       const remainingRevenue = tierLegacy.revenue * (1 - inputs.legacyBase.churnRate);
@@ -470,6 +490,7 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       monthData.legacyRevenue[tier] = remainingRevenue + expansionRevenue;
       monthData.legacyExpansionRevenue[tier] = expansionRevenue;
       monthData.totalLegacyRevenue += remainingRevenue + expansionRevenue;
+      monthData.totalLegacyExpansionRevenue += expansionRevenue;
       
       // Update for next month
       legacyClients[tier] = {
@@ -485,6 +506,9 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       }
       monthData.totalActiveClients += monthData.legacyClients[tier];
     }
+    
+    // Separar renewal legado de expansion legado
+    monthData.totalLegacyRenewalRevenue = monthData.totalLegacyRevenue - monthData.totalLegacyExpansionRevenue;
     
     // Calculate total revenue
     monthData.totalRevenue = 
@@ -591,6 +615,102 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
     monthData.capacityPlan.hiresSaber = Math.max(0, hcGrowthSaber + monthData.capacityPlan.turnoverSaber);
     monthData.capacityPlan.hiresExecutar = Math.max(0, hcGrowthExecutar + monthData.capacityPlan.turnoverExecutar);
     monthData.capacityPlan.totalHires = monthData.capacityPlan.hiresSaber + monthData.capacityPlan.hiresExecutar;
+
+    // ===== Sales sizing guidance (SDR / Closers) - não contam no totalHC =====
+    // Regras: 200 MQL por SDR, 50 SAL por Closer
+    const totalMQLs = Object.values(monthData.mqls).reduce((s, v) => s + v, 0);
+    const totalSALs = Object.values(monthData.sals).reduce((s, v) => s + v, 0);
+
+    const requiredSDR = Math.ceil(totalMQLs / 200);
+    const requiredClosers = Math.ceil(totalSALs / 50);
+
+    // Calcular diferenças considerando contratações anteriores (persistem)
+    const hiresThisMonthSDR = Math.max(0, requiredSDR - runningSDR);
+    const hiresThisMonthClosers = Math.max(0, requiredClosers - runningClosers);
+
+    // Atualizar running headcount para próximos meses
+    runningSDR += hiresThisMonthSDR;
+    runningClosers += hiresThisMonthClosers;
+
+    monthData.capacityPlan.salesSDRRequired = requiredSDR;
+    monthData.capacityPlan.salesClosersRequired = requiredClosers;
+    // salesCurrent* representa o HC disponível APÓS eventuais contratações deste mês
+    monthData.capacityPlan.salesCurrentSDR = runningSDR;
+    monthData.capacityPlan.salesCurrentClosers = runningClosers;
+    monthData.capacityPlan.salesHires = hiresThisMonthSDR + hiresThisMonthClosers; // novas contratações no mês
+    
+    // === SALES METRICS CALCULATION ===
+    // Inicializar estrutura salesMetrics
+    monthData.dre.salesMetrics = {
+      closersRequired: 0,
+      sdrsRequired: 0,
+      farmersRequired: 0,
+      remuneracaoCloser: 0,
+      remuneracaoSDR: 0,
+      remuneracaoFarmer: 0,
+      comissaoVendasActivation: 0,
+      comissaoFarmerExpansion: 0,
+      folhaGestaoComercial: 0,
+      bonusCampanhasActivation: 0,
+      estruturaSuporte: 0,
+      despesasVisitasActivation: 0,
+      bonusCampanhasExpansion: 0,
+      comissaoOperacao: 0,
+      despesasVisitasExpansion: 0,
+      despesaComercialActivation: 0,
+      despesaComercialExpansion: 0,
+      totalDespesasMarketingVendas: 0,
+    };
+    
+    // 1. Calcular quantidades necessárias
+    const totalWons = TIERS.reduce((sum, tier) => sum + monthData.wons[tier], 0);
+    const totalSQLs = TIERS.reduce((sum, tier) => sum + monthData.sqls[tier], 0);
+    const clientesAtivos = monthData.capacityPlan.totalClientsSaber + monthData.capacityPlan.totalClientsExecutar;
+
+    monthData.dre.salesMetrics.closersRequired = Math.ceil(totalWons / inputs.salesConfig.closerProductivity);
+    monthData.dre.salesMetrics.sdrsRequired = Math.ceil(totalSQLs / inputs.salesConfig.sdrProductivity);
+    monthData.dre.salesMetrics.farmersRequired = Math.ceil(clientesAtivos / inputs.salesConfig.farmerProductivity);
+
+    // 2. Calcular remunerações
+    monthData.dre.salesMetrics.remuneracaoCloser = monthData.dre.salesMetrics.closersRequired * inputs.salesConfig.closerSalary;
+    monthData.dre.salesMetrics.remuneracaoSDR = monthData.dre.salesMetrics.sdrsRequired * inputs.salesConfig.sdrSalary;
+    monthData.dre.salesMetrics.remuneracaoFarmer = monthData.dre.salesMetrics.farmersRequired * inputs.salesConfig.farmerSalary;
+
+    // 3. Calcular comissões
+    monthData.dre.salesMetrics.comissaoVendasActivation = monthData.totalNewRevenue * inputs.salesConfig.comissaoActivationRate;
+    const receitaExpansionTotal = monthData.totalExpansionRevenue + monthData.totalLegacyExpansionRevenue;
+    monthData.dre.salesMetrics.comissaoFarmerExpansion = receitaExpansionTotal * inputs.salesConfig.comissaoExpansionRate;
+
+    // 4. Despesas fixas
+    monthData.dre.salesMetrics.folhaGestaoComercial = inputs.salesConfig.folhaGestaoComercial;
+    monthData.dre.salesMetrics.bonusCampanhasActivation = inputs.salesConfig.bonusCampanhasActivation;
+    monthData.dre.salesMetrics.estruturaSuporte = inputs.salesConfig.estruturaSuporte[idx];
+    monthData.dre.salesMetrics.despesasVisitasActivation = inputs.salesConfig.despesasVisitasActivation;
+    monthData.dre.salesMetrics.bonusCampanhasExpansion = inputs.salesConfig.bonusCampanhasExpansion;
+    monthData.dre.salesMetrics.comissaoOperacao = inputs.salesConfig.comissaoOperacao;
+    monthData.dre.salesMetrics.despesasVisitasExpansion = inputs.salesConfig.despesasVisitasExpansion;
+
+    // 5. Totais
+    monthData.dre.salesMetrics.despesaComercialActivation = 
+      monthData.dre.salesMetrics.bonusCampanhasActivation +
+      monthData.dre.salesMetrics.comissaoVendasActivation +
+      monthData.dre.salesMetrics.estruturaSuporte +
+      monthData.dre.salesMetrics.remuneracaoCloser +
+      monthData.dre.salesMetrics.remuneracaoSDR +
+      monthData.dre.salesMetrics.despesasVisitasActivation;
+
+    monthData.dre.salesMetrics.despesaComercialExpansion = 
+      monthData.dre.salesMetrics.remuneracaoFarmer +
+      monthData.dre.salesMetrics.comissaoFarmerExpansion +
+      monthData.dre.salesMetrics.comissaoOperacao +
+      monthData.dre.salesMetrics.bonusCampanhasExpansion +
+      monthData.dre.salesMetrics.despesasVisitasExpansion;
+
+    // Total Despesas Marketing e Vendas = Activation + Expansion + Folha Gestão Comercial
+    monthData.dre.salesMetrics.totalDespesasMarketingVendas = 
+      monthData.dre.salesMetrics.despesaComercialActivation +
+      monthData.dre.salesMetrics.despesaComercialExpansion +
+      monthData.dre.salesMetrics.folhaGestaoComercial;
     
     // Calcular métricas
     if (monthData.capacityPlan.totalHC > 0) {
@@ -631,6 +751,12 @@ function calculateDRE(
   const dre = createEmptyDREData(monthData.month);
   const idx = monthData.month - 1;
   
+  // Calcular métricas necessárias para Sales Metrics e KPIs
+  const totalWons = TIERS.reduce((sum, tier) => sum + monthData.wons[tier], 0);
+  const totalSQLs = TIERS.reduce((sum, tier) => sum + monthData.sqls[tier], 0);
+  const clientesAtivos = monthData.capacityPlan.totalClientsSaber + monthData.capacityPlan.totalClientsExecutar;
+  
+  
   // ========== RECEITA ==========
   dre.revenue = monthData.totalRevenue;
   dre.activationRevenue = monthData.totalNewRevenue;
@@ -658,34 +784,34 @@ function calculateDRE(
   // Modelo: CSP baseado em Squads Necessárias do Capacity Plan
   // CSP = Número de Squads × Custo Total do Squad
   
-  // Calcular custo total de cada squad baseado nos salários dos cargos
+  // Calcular custo total de cada squad baseado nos salários dos cargos (suporta arrays mensais)
   const custoSquadExecutar = 
-    config.cspExecutarCoordenador +
-    (config.cspExecutarAccountSr * 2) + // 2 Account Sr
-    config.cspExecutarGestorTrafegoSr +
-    config.cspExecutarGestorTrafegoPl +
-    config.cspExecutarCopywriter +
-    config.cspExecutarDesignerSr +
-    config.cspExecutarDesignerPl +
-    config.cspExecutarSocialMedia;
-  
+    getMonthlyValue(config.cspExecutarCoordenador, idx) +
+    (getMonthlyValue(config.cspExecutarAccountSr, idx) * 2) + // 2 Account Sr
+    getMonthlyValue(config.cspExecutarGestorTrafegoSr, idx) +
+    getMonthlyValue(config.cspExecutarGestorTrafegoPl, idx) +
+    getMonthlyValue(config.cspExecutarCopywriter, idx) +
+    getMonthlyValue(config.cspExecutarDesignerSr, idx) +
+    getMonthlyValue(config.cspExecutarDesignerPl, idx) +
+    getMonthlyValue(config.cspExecutarSocialMedia, idx);
+
   const custoSquadSaber = 
-    config.cspSaberCoordenador +
-    config.cspSaberAccountSr +
-    config.cspSaberAccountPl +
-    config.cspSaberAccountJr +
-    config.cspSaberGestorTrafegoPl +
-    config.cspSaberCopywriter +
-    config.cspSaberDesignerSr +
-    config.cspSaberTech +
-    config.cspSaberSalesEnablement;
+    getMonthlyValue(config.cspSaberCoordenador, idx) +
+    getMonthlyValue(config.cspSaberAccountSr, idx) +
+    getMonthlyValue(config.cspSaberAccountPl, idx) +
+    getMonthlyValue(config.cspSaberAccountJr, idx) +
+    getMonthlyValue(config.cspSaberGestorTrafegoPl, idx) +
+    getMonthlyValue(config.cspSaberCopywriter, idx) +
+    getMonthlyValue(config.cspSaberDesignerSr, idx) +
+    getMonthlyValue(config.cspSaberTech, idx) +
+    getMonthlyValue(config.cspSaberSalesEnablement, idx);
   
   // CSP EXECUTAR
   const squadsExecutarNecessarias = monthData.capacityPlan.squadsExecutar;
   dre.cspExecutar = squadsExecutarNecessarias * custoSquadExecutar;
   
   // Divisão: Coordenador = Overhead, Resto = Operacional
-  dre.cspExecutarOverhead = squadsExecutarNecessarias * config.cspExecutarCoordenador;
+  dre.cspExecutarOverhead = squadsExecutarNecessarias * getMonthlyValue(config.cspExecutarCoordenador, idx);
   dre.cspExecutarDireto = dre.cspExecutar - dre.cspExecutarOverhead;
   
   // CSP SABER
@@ -693,7 +819,7 @@ function calculateDRE(
   dre.cspSaber = squadsSaberNecessarias * custoSquadSaber;
   
   // Divisão: Coordenador = Overhead, Resto = Operacional
-  dre.cspSaberOverhead = squadsSaberNecessarias * config.cspSaberCoordenador;
+  dre.cspSaberOverhead = squadsSaberNecessarias * getMonthlyValue(config.cspSaberCoordenador, idx);
   dre.cspSaberDireto = dre.cspSaber - dre.cspSaberOverhead;
   
   // CSP TER
@@ -701,7 +827,11 @@ function calculateDRE(
   // Não precisa adicionar separadamente pois Ter já foi contabilizado em Executar
   dre.cspTer = 0;
   
-  dre.cspTotal = dre.cspExecutar + dre.cspSaber + dre.cspTer;
+  // Outros CSP
+  const cspCssWebProducts = getMonthlyValue(config.cspCssWebProducts, idx);
+  const cspGerentes = getMonthlyValue(config.cspGerentes, idx);
+  
+  dre.cspTotal = dre.cspExecutar + dre.cspSaber + dre.cspTer + cspCssWebProducts + cspGerentes;
   dre.percentualCSP = dre.receitaLiquida > 0 ? dre.cspTotal / dre.receitaLiquida : 0;
   
   // ========== MARGEM OPERACIONAL ==========
@@ -709,24 +839,10 @@ function calculateDRE(
   dre.percentualMargemOperacional = dre.receitaLiquida > 0 ? dre.margemOperacional / dre.receitaLiquida : 0;
   
   // ========== DESPESAS MARKETING E VENDAS ==========
-  // Investimento marketing vem do topline do mês
-  dre.investimentoMarketing = inputs.topline.investmentMonthly[idx];
-  dre.folhaGestaoComercial = config.folhaGestaoComercial;
-  
-  // Comissões baseadas em clientes Won
-  const totalWons = TIERS.reduce((sum, tier) => sum + monthData.wons[tier], 0);
-  dre.comissoes = totalWons * config.comissaoMediaPorCliente;
-  
-  // Estimativa de closers e SDRs baseada em volume de investimento
-  // Aproximação: 1 closer para cada R$ 200k de investimento, 1 SDR para cada R$ 300k
-  const qtdClosers = Math.ceil(dre.investimentoMarketing / 200000);
-  const qtdSDRs = Math.ceil(dre.investimentoMarketing / 300000);
-  dre.remuneracaoCloser = qtdClosers * config.salarioCloser;
-  dre.remuneracaoSDR = qtdSDRs * config.salarioSDR;
-  dre.despesasVisitas = config.despesasVisitas;
-  
-  dre.despesaComercialActivation = dre.comissoes + dre.remuneracaoCloser + dre.remuneracaoSDR + dre.despesasVisitas;
-  dre.totalMarketingVendas = dre.investimentoMarketing + dre.folhaGestaoComercial + dre.despesaComercialActivation;
+  // Use salesMetrics calculados anteriormente
+  dre.salesMetrics = monthData.dre.salesMetrics;
+  // Total = somente despesas comerciais (Activation + Expansion + Folha Gestão)
+  dre.totalMarketingVendas = monthData.dre.salesMetrics.totalDespesasMarketingVendas;
   
   // ========== MARGEM DE CONTRIBUIÇÃO ==========
   dre.margemContribuicao = dre.margemOperacional - dre.totalMarketingVendas;
@@ -794,8 +910,8 @@ function calculateDRE(
   dre.caixaFinal = dre.caixaInicial + dre.saldoCaixaMes;
   
   // ========== KPIS ==========
-  // CAC: Investimento / Clientes Won
-  dre.cac = totalWons > 0 ? dre.investimentoMarketing / totalWons : 0;
+  // CAC: Investimento em Marketing e Vendas / Clientes Won
+  dre.cac = totalWons > 0 ? dre.totalMarketingVendas / totalWons : 0;
   
   // CLV: Valor médio por cliente × lifetime esperado (simplificado)
   dre.quantidadeClientes = monthData.totalActiveClients;

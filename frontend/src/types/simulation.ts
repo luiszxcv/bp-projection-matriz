@@ -87,6 +87,37 @@ export interface SquadRoleHours {
   [roleName: string]: RoleHoursByTier;
 }
 
+// Sales Metrics (calculated dynamically)
+export interface SalesMetrics {
+  // Quantities
+  closersRequired: number;
+  sdrsRequired: number;
+  farmersRequired: number;
+  
+  // Remuneração
+  remuneracaoCloser: number;
+  remuneracaoSDR: number;
+  remuneracaoFarmer: number;
+  
+  // Comissões
+  comissaoVendasActivation: number;
+  comissaoFarmerExpansion: number;
+  
+  // Despesas Fixas
+  folhaGestaoComercial: number;
+  bonusCampanhasActivation: number;
+  estruturaSuporte: number;
+  despesasVisitasActivation: number;
+  bonusCampanhasExpansion: number;
+  comissaoOperacao: number;
+  despesasVisitasExpansion: number;
+  
+  // Totals
+  despesaComercialActivation: number;
+  despesaComercialExpansion: number;
+  totalDespesasMarketingVendas: number;
+}
+
 // Capacity Plan Types
 export interface CapacityPlanConfig {
   initialHCSaber: number;               // HC inicial Saber (pessoas já existentes)
@@ -136,6 +167,12 @@ export interface CapacityPlanData {
   revenuePerHC: number;
   hoursUtilizationSaber: number; // % de utilização da capacidade Saber (horas)
   hoursUtilizationExecutar: number; // % de utilização da capacidade Executar (horas)
+  // Sales guidance (separate from total HC) - não contam em `totalHC`
+  salesSDRRequired?: number;
+  salesClosersRequired?: number;
+  salesCurrentSDR?: number;
+  salesCurrentClosers?: number;
+  salesHires?: number; // Contratações sugeridas para time de vendas
 }
 
 // DRE Configuration
@@ -156,37 +193,44 @@ export interface DREConfig {
   // SQUAD EXECUTAR (9 pessoas, atende 20 clientes)
   cspExecutarSquadMensal: number;        // Default: R$ 73.000/squad/mês
   cspExecutarCapacidadeClientes: number; // Default: 20 clientes/squad
-  cspExecutarCoordenador: number;        // Default: R$ 14.000
-  cspExecutarAccountSr: number;          // Default: R$ 6.500 (2x)
-  cspExecutarGestorTrafegoSr: number;    // Default: R$ 6.500
-  cspExecutarGestorTrafegoPl: number;    // Default: R$ 6.500
-  cspExecutarCopywriter: number;         // Default: R$ 5.000
-  cspExecutarDesignerSr: number;         // Default: R$ 6.000
-  cspExecutarDesignerPl: number;         // Default: R$ 4.500
-  cspExecutarSocialMedia: number;        // Default: R$ 5.000
+  cspExecutarCoordenador: number | number[];        // Default: R$ 14.000 ou array[12]
+  cspExecutarAccountSr: number | number[];          // Default: R$ 6.500 (2x) ou array[12]
+  cspExecutarGestorTrafegoSr: number | number[];    // Default: R$ 6.500 ou array[12]
+  cspExecutarGestorTrafegoPl: number | number[];    // Default: R$ 6.500 ou array[12]
+  cspExecutarCopywriter: number | number[];         // Default: R$ 5.000 ou array[12]
+  cspExecutarDesignerSr: number | number[];         // Default: R$ 6.000 ou array[12]
+  cspExecutarDesignerPl: number | number[];         // Default: R$ 4.500 ou array[12]
+  cspExecutarSocialMedia: number | number[];        // Default: R$ 5.000 ou array[12]
   
   // SQUAD SABER (9 pessoas, atende 15 clientes)
   cspSaberSquadMensal: number;           // Default: R$ 80.238/squad/mês
   cspSaberCapacidadeClientes: number;    // Default: 15 clientes/squad
-  cspSaberCoordenador: number;           // Default: R$ 20.000
-  cspSaberAccountSr: number;             // Default: R$ 12.500
-  cspSaberAccountJr: number;             // Default: R$ 5.000
-  cspSaberGestorTrafegoPl: number;       // Default: R$ 10.000
-  cspSaberCopywriter: number;            // Default: R$ 8.000
-  cspSaberDesignerSr: number;            // Default: R$ 8.000
-  cspSaberTech: number;                  // Default: R$ 2.738 (part-time)
-  cspSaberAccountPl: number;             // Default: R$ 8.000
-  cspSaberSalesEnablement: number;       // Default: R$ 6.000
+  cspSaberCoordenador: number | number[];           // Default: R$ 20.000 ou array[12]
+  cspSaberAccountSr: number | number[];             // Default: R$ 12.500 ou array[12]
+  cspSaberAccountJr: number | number[];             // Default: R$ 5.000 ou array[12]
+  cspSaberGestorTrafegoPl: number | number[];       // Default: R$ 10.000 ou array[12]
+  cspSaberCopywriter: number | number[];            // Default: R$ 8.000 ou array[12]
+  cspSaberDesignerSr: number | number[];            // Default: R$ 8.000 ou array[12]
+  cspSaberTech: number | number[];                  // Default: R$ 2.738 (part-time) ou array[12]
+  cspSaberAccountPl: number | number[];             // Default: R$ 8.000 ou array[12]
+  cspSaberSalesEnablement: number | number[];       // Default: R$ 6.000 ou array[12]
+  
+  // Outros CSP
+  cspCssWebProducts: number | number[];             // Default: R$ 23.000 fixo
+  cspGerentes: number | number[];                   // Default: R$ 60k-90k com rampa trimestral
   
   // TER usa estrutura similar ao Saber (mesma squad)
   cspTerUsaSaberSquad: boolean;          // Default: true
   
   // Despesas Marketing e Vendas
   folhaGestaoComercial: number;     // Default: R$ 32.500/mês
-  comissaoM ediaaPorCliente: number; // Default: R$ 2.500/cliente
+  comissaoMediaPorCliente: number; // Default: R$ 2.500/cliente
   salarioCloser: number;             // Default: R$ 9.000
   salarioSDR: number;                // Default: R$ 4.500
   despesasVisitas: number;           // Default: R$ 2.000/mês
+  // Contagem atual da equipe de vendas (para cálculo de necessidade de contratações)
+  currentSDR?: number;               // Ex: 1
+  currentClosers?: number;           // Ex: 2
   
   // Despesas Administrativas (valores fixos mensais)
   despesasTimeAdm: number;          // Default: R$ 174.400
@@ -210,6 +254,34 @@ export interface DREConfig {
   pagamentoFinanciamento: number;    // Default: R$ 11.388,93/mês
   distribuicaoDividendos: number;    // Default: R$ 150.000/mês
   caixaInicial: number;              // Default: R$ 1.500.000
+}
+
+// Sales & Marketing Configuration
+export interface SalesConfig {
+  // Comissões (%)
+  comissaoActivationRate: number;      // Default: 5% (0.05)
+  comissaoExpansionRate: number;       // Default: 6% (0.06)
+  
+  // Remuneração Closers
+  closerProductivity: number;          // Default: 10 WONs/mês/closer
+  closerSalary: number;                // Default: R$ 13.500/mês
+  
+  // Remuneração SDRs
+  sdrProductivity: number;             // Default: 80 SQLs/mês/SDR
+  sdrSalary: number;                   // Default: R$ 3.250/mês
+  
+  // Remuneração Farmers
+  farmerProductivity: number;          // Default: 100 clientes/farmer
+  farmerSalary: number;                // Default: R$ 7.000/mês
+  
+  // Despesas Fixas Mensais
+  folhaGestaoComercial: number;        // Default: R$ 32.500/mês
+  bonusCampanhasActivation: number;    // Default: R$ 8.000/mês
+  estruturaSuporte: number[];          // Array de 12 meses (Default: [3500, 3500, ...])
+  despesasVisitasActivation: number;   // Default: R$ 5.000/mês
+  bonusCampanhasExpansion: number;     // Default: R$ 1.500/mês
+  comissaoOperacao: number;            // Default: R$ 8.000/mês
+  despesasVisitasExpansion: number;    // Default: R$ 2.000/mês
 }
 
 // DRE Data (resultado dos cálculos por mês)
@@ -254,14 +326,8 @@ export interface DREData {
   margemOperacional: number;
   percentualMargemOperacional: number;
   
-  // DESPESAS MARKETING E VENDAS
-  investimentoMarketing: number;          // Do BP (topline)
-  folhaGestaoComercial: number;
-  despesaComercialActivation: number;
-  comissoes: number;
-  remuneracaoCloser: number;
-  remuneracaoSDR: number;
-  despesasVisitas: number;
+  // DESPESAS MARKETING E VENDAS (calculado via SalesMetrics)
+  salesMetrics: SalesMetrics;
   totalMarketingVendas: number;
   
   // MARGEM DE CONTRIBUIÇÃO
@@ -324,6 +390,7 @@ export interface SimulationInputs {
   legacyBase: LegacyBase;
   expansionDistribution: ExpansionDistribution;
   capacityPlan: CapacityPlanConfig;
+  salesConfig: SalesConfig;
   dreConfig: DREConfig;
 }
 
@@ -345,8 +412,12 @@ export interface MonthlyData {
   // Direct funnel activations only (no conversions or renewals)
   directActivations: Record<Tier, ProductDistribution>;
   
+  // Activation breakdown (valores debitados pela quebra de ativação)
+  activationBreakdown: Record<Tier, ProductDistribution>;
+  
   // Legacy
   legacyClients: TierDistribution;
+  legacyRevenueBeforeChurn: TierDistribution; // Receita antes de aplicar churn
   legacyRevenue: TierDistribution;
   legacyExpansionRevenue: TierDistribution; // Receita de expansão da base legada por tier (total)
   legacyExpansionByProduct: Record<Tier, ProductDistribution>; // Receita de expansão por produto/tier
@@ -371,6 +442,8 @@ export interface MonthlyData {
   totalRenewalRevenue: number;
   totalExpansionRevenue: number;
   totalLegacyRevenue: number;
+  totalLegacyRenewalRevenue: number;  // Receita de renewal da base legada (separado)
+  totalLegacyExpansionRevenue: number; // Receita de expansão da base legada (já existe acima, mas copiado para total)
   totalRevenue: number;
   totalActiveClients: number;
   

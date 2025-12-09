@@ -26,6 +26,11 @@ interface SpreadsheetViewProps {
 const TIERS: Tier[] = ['enterprise', 'large', 'medium', 'small', 'tiny'];
 const PRODUCTS: Product[] = ['saber', 'ter', 'executarNoLoyalty', 'executarLoyalty', 'potencializar'];
 
+// Helper: get monthly value from number or array (for CSP salary ramps)
+const getMonthlyValue = (value: number | number[], monthIndex: number): number => {
+  return Array.isArray(value) ? value[monthIndex] : value;
+};
+
 const TOOLTIPS = {
   investment: 'Investimento mensal em marketing para geração de leads',
   cpl: 'Custo por Lead - quanto custa para adquirir cada MQL',
@@ -73,6 +78,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
     totals: true,
     totalsClients: false,
     capacityPlan: true,
+    salesConfig: true,
     dre: true,
   });
 
@@ -396,6 +402,8 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
       return legacyBase - legacyExpansion;
     }));
     addRow('$ Receita Base Legada Expansão', monthlyData.map(m => TIERS.reduce((s, tier) => s + m.legacyExpansionRevenue[tier], 0)));
+    addRow('$ Receita Total Saber (All)', monthlyData.map(m => TIERS.reduce((s, tier) => s + m.revenueByTierProduct[tier].saber, 0)));
+    addRow('$ Receita Total Ter (All)', monthlyData.map(m => TIERS.reduce((s, tier) => s + m.revenueByTierProduct[tier].ter, 0)));
     addRow('$ RECEITA TOTAL', monthlyData.map(m => m.totalRevenue));
 
     // CAPACITY PLAN
@@ -416,6 +424,12 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
     addRow('# Contratações Executar', monthlyData.map(m => m.capacityPlan.hiresExecutar));
     addRow('# Total Contratações', monthlyData.map(m => m.capacityPlan.totalHires));
     addRow('$ Receita/HC', monthlyData.map(m => m.capacityPlan.revenuePerHC));
+    // Sales guidance (SDR / Closers) - não contam no totalHC
+    addRow('# Sales: SDR Required', monthlyData.map(m => m.capacityPlan.salesSDRRequired ?? 0));
+    addRow('# Sales: Closers Required', monthlyData.map(m => m.capacityPlan.salesClosersRequired ?? 0));
+    addRow('# Sales: Current SDR', monthlyData.map(m => m.capacityPlan.salesCurrentSDR ?? 0));
+    addRow('# Sales: Current Closers', monthlyData.map(m => m.capacityPlan.salesCurrentClosers ?? 0));
+    addRow('# Contratações Sales', monthlyData.map(m => m.capacityPlan.salesHires ?? 0));
 
     // Create workbook and worksheet
     const ws = XLSX.utils.aoa_to_sheet(data);
@@ -899,6 +913,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
 
                   {/* Product Revenue - results */}
                   {(funnelFilter === 'all' || funnelFilter === 'results') && (
+                  <>
                   <div className="flex row-hover">
                     <RowHeader 
                       label={`$ Receita ${PRODUCT_LABELS[product]}`} 
@@ -918,6 +933,29 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                       className="bg-primary/10 font-semibold"
                     />
                   </div>
+                  
+                  {/* Activation Breakdown - results */}
+                  <div className="flex row-hover bg-red-50/50">
+                    <RowHeader 
+                      label={`(-) Quebra Ativação ${PRODUCT_LABELS[product]}`} 
+                      tooltip="Valor debitado pela taxa de ativação (7% não ativados)"
+                      className="pl-8 text-red-600" 
+                    />
+                    {monthlyData.map((m, i) => (
+                      <SpreadsheetCell
+                        key={i}
+                        value={-m.activationBreakdown[tier][product]}
+                        format="currency"
+                        className="text-red-600"
+                      />
+                    ))}
+                    <SpreadsheetCell
+                      value={-monthlyData.reduce((sum, m) => sum + m.activationBreakdown[tier][product], 0)}
+                      format="currency"
+                      className="bg-primary/10 font-semibold text-red-600"
+                    />
+                  </div>
+                  </>
                   )}
                 </React.Fragment>
               ))}
@@ -1409,54 +1447,106 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
           {TIERS.map((tier) => (
             <React.Fragment key={`legacy-${tier}`}>
               <div className="flex row-hover">
-                <RowHeader label={`${TIER_LABELS[tier]} - Clientes Iniciais`} className="pl-6" />
+                <RowHeader label={`${TIER_LABELS[tier]} - Clientes Iniciais`} tooltip="Valor inicial de clientes (editável apenas no mês 1)" className="pl-6" />
                 {MONTHS.map((_, i) => (
                   <SpreadsheetCell
                     key={i}
-                    value={i === 0 ? inputs.legacyBase[tier].clients : monthlyData[i]?.legacyClients[tier] || 0}
+                    value={inputs.legacyBase[tier].clients}
                     onChange={i === 0 ? (v) => updateLegacyBase(tier, 'clients', v) : undefined}
                     editable={i === 0}
                     format="number"
                   />
                 ))}
                 <SpreadsheetCell
-                  value={monthlyData[11]?.legacyClients[tier] || 0}
+                  value={inputs.legacyBase[tier].clients}
                   format="number"
                   className="bg-primary/10"
                 />
               </div>
 
               <div className="flex row-hover">
-                <RowHeader label={`${TIER_LABELS[tier]} - Receita Inicial`} className="pl-6" />
+                <RowHeader label={`${TIER_LABELS[tier]} - # Clientes Mês a Mês`} tooltip="Quantidade de clientes da base legada após aplicar churn mensal" className="pl-6 font-semibold" />
+                {monthlyData.map((m, i) => (
+                  <SpreadsheetCell
+                    key={i}
+                    value={m.legacyClients[tier]}
+                    format="number"
+                    className="bg-blue-50/50"
+                  />
+                ))}
+                <SpreadsheetCell
+                  value={monthlyData[11]?.legacyClients[tier] || 0}
+                  format="number"
+                  className="bg-primary/10 font-semibold"
+                />
+              </div>
+
+              <div className="flex row-hover">
+                <RowHeader label={`${TIER_LABELS[tier]} - Receita Inicial`} tooltip="Valor inicial de receita (editável apenas no mês 1)" className="pl-6" />
                 {MONTHS.map((_, i) => (
                   <SpreadsheetCell
                     key={i}
-                    value={i === 0 ? inputs.legacyBase[tier].revenue : monthlyData[i]?.legacyRevenue[tier] || 0}
+                    value={inputs.legacyBase[tier].revenue}
                     onChange={i === 0 ? (v) => updateLegacyBase(tier, 'revenue', v) : undefined}
                     editable={i === 0}
                     format="currency"
                   />
                 ))}
                 <SpreadsheetCell
-                  value={monthlyData.reduce((sum, m) => sum + m.legacyRevenue[tier], 0)}
+                  value={inputs.legacyBase[tier].revenue}
+                  format="currency"
+                  className="bg-primary/10"
+                />
+              </div>
+
+              <div className="flex row-hover">
+                <RowHeader label={`${TIER_LABELS[tier]} - $ Receita Base Mês a Mês`} tooltip="Receita recorrente da base legada (sem expansão) após aplicar churn" className="pl-6 font-semibold" />
+                {monthlyData.map((m, i) => (
+                  <SpreadsheetCell
+                    key={i}
+                    value={m.legacyRevenue[tier] - m.legacyExpansionRevenue[tier]}
+                    format="currency"
+                    className="bg-blue-50/50"
+                  />
+                ))}
+                <SpreadsheetCell
+                  value={monthlyData.reduce((sum, m) => sum + (m.legacyRevenue[tier] - m.legacyExpansionRevenue[tier]), 0)}
                   format="currency"
                   className="bg-primary/10 font-semibold"
                 />
               </div>
 
               <div className="flex row-hover">
-                <RowHeader label={`${TIER_LABELS[tier]} - $ Expansão Total`} tooltip="Receita de expansão da base legada" className="pl-6" />
+                <RowHeader label={`${TIER_LABELS[tier]} - $ Expansão Mês a Mês`} tooltip="Receita de expansão da base legada" className="pl-6 font-semibold" />
                 {monthlyData.map((m, i) => (
                   <SpreadsheetCell
                     key={i}
                     value={m.legacyExpansionRevenue[tier]}
                     format="currency"
+                    className="bg-green-50/50"
                   />
                 ))}
                 <SpreadsheetCell
                   value={monthlyData.reduce((sum, m) => sum + m.legacyExpansionRevenue[tier], 0)}
                   format="currency"
                   className="bg-primary/10 font-semibold"
+                />
+              </div>
+
+              <div className="flex row-hover">
+                <RowHeader label={`${TIER_LABELS[tier]} - $ Receita Total Mês a Mês`} tooltip="Receita total da base legada (base + expansão)" className="pl-6 font-bold" />
+                {monthlyData.map((m, i) => (
+                  <SpreadsheetCell
+                    key={i}
+                    value={m.legacyRevenue[tier]}
+                    format="currency"
+                    className="bg-primary/5 font-semibold"
+                  />
+                ))}
+                <SpreadsheetCell
+                  value={monthlyData.reduce((sum, m) => sum + m.legacyRevenue[tier], 0)}
+                  format="currency"
+                  className="bg-primary/10 font-bold"
                 />
               </div>
 
@@ -1482,9 +1572,60 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             </React.Fragment>
           ))}
 
-          {/* Totais Expansão Base Legada */}
-          <div className="flex row-hover bg-primary/5">
-            <RowHeader label="TOTAL $ Expansão Legada" className="font-semibold" />
+          {/* Totais Consolidados Base Legada */}
+          <div className="flex row-hover bg-primary/10">
+            <RowHeader label="TOTAL # Clientes Base Legada" tooltip="Total de clientes da base legada (todos os tiers)" className="font-bold" />
+            {monthlyData.map((m, i) => (
+              <SpreadsheetCell
+                key={i}
+                value={TIERS.reduce((sum, tier) => sum + m.legacyClients[tier], 0)}
+                format="number"
+                className="font-semibold"
+              />
+            ))}
+            <SpreadsheetCell
+              value={monthlyData[11] ? TIERS.reduce((sum, tier) => sum + monthlyData[11].legacyClients[tier], 0) : 0}
+              format="number"
+              className="bg-primary/20 font-bold"
+            />
+          </div>
+
+          <div className="flex row-hover bg-primary/10">
+            <RowHeader label="TOTAL $ Receita Base Legada SC" tooltip="Total de receita recorrente da base legada SEM CHURN (sem expansão)" className="font-bold" />
+            {monthlyData.map((m, i) => (
+              <SpreadsheetCell
+                key={i}
+                value={TIERS.reduce((sum, tier) => sum + m.legacyRevenueBeforeChurn[tier], 0)}
+                format="currency"
+                className="font-semibold"
+              />
+            ))}
+            <SpreadsheetCell
+              value={monthlyData.reduce((sum, m) => sum + TIERS.reduce((s, tier) => s + m.legacyRevenueBeforeChurn[tier], 0), 0)}
+              format="currency"
+              className="bg-primary/20 font-bold"
+            />
+          </div>
+
+          <div className="flex row-hover bg-primary/10">
+            <RowHeader label="TOTAL $ Receita Base Legada CC" tooltip="Total de receita recorrente da base legada COM CHURN (sem expansão)" className="font-bold" />
+            {monthlyData.map((m, i) => (
+              <SpreadsheetCell
+                key={i}
+                value={TIERS.reduce((sum, tier) => sum + (m.legacyRevenue[tier] - m.legacyExpansionRevenue[tier]), 0)}
+                format="currency"
+                className="font-semibold"
+              />
+            ))}
+            <SpreadsheetCell
+              value={monthlyData.reduce((sum, m) => sum + TIERS.reduce((s, tier) => s + (m.legacyRevenue[tier] - m.legacyExpansionRevenue[tier]), 0), 0)}
+              format="currency"
+              className="bg-primary/20 font-bold"
+            />
+          </div>
+
+          <div className="flex row-hover bg-primary/10">
+            <RowHeader label="TOTAL $ Expansão Legada" tooltip="Total de receita de expansão da base legada" className="font-bold" />
             {monthlyData.map((m, i) => (
               <SpreadsheetCell
                 key={i}
@@ -1496,7 +1637,24 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={monthlyData.reduce((sum, m) => sum + TIERS.reduce((s, tier) => s + m.legacyExpansionRevenue[tier], 0), 0)}
               format="currency"
-              className="bg-primary/10 font-bold"
+              className="bg-primary/20 font-bold"
+            />
+          </div>
+
+          <div className="flex row-hover bg-primary/20">
+            <RowHeader label="TOTAL $ Receita Total Base Legada" tooltip="Total geral da receita da base legada (base + expansão)" className="font-bold" />
+            {monthlyData.map((m, i) => (
+              <SpreadsheetCell
+                key={i}
+                value={m.totalLegacyRevenue}
+                format="currency"
+                className="font-bold"
+              />
+            ))}
+            <SpreadsheetCell
+              value={monthlyData.reduce((sum, m) => sum + m.totalLegacyRevenue, 0)}
+              format="currency"
+              className="bg-primary/30 font-bold text-lg"
             />
           </div>
             </>
@@ -1697,6 +1855,19 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             })}
             <SpreadsheetCell
               value={monthlyData.reduce((sum, m) => sum + TIERS.reduce((s, tier) => s + m.revenueByTierProduct[tier].saber, 0), 0)}
+              format="currency"
+              className="bg-primary/20 font-bold"
+            />
+          </div>
+
+          <div className="flex row-hover bg-primary/10">
+            <RowHeader label="$ Receita Total Ter (All)" tooltip="Toda receita de Ter (aquisição)" className="pl-4 font-bold" />
+            {monthlyData.map((m, i) => {
+              const revenue = TIERS.reduce((sum, tier) => sum + m.revenueByTierProduct[tier].ter, 0);
+              return <SpreadsheetCell key={i} value={revenue} format="currency" className="font-semibold" />;
+            })}
+            <SpreadsheetCell
+              value={monthlyData.reduce((sum, m) => sum + TIERS.reduce((s, tier) => s + m.revenueByTierProduct[tier].ter, 0), 0)}
               format="currency"
               className="bg-primary/20 font-bold"
             />
@@ -1928,6 +2099,21 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={monthlyData[11] ? TIERS.reduce((sum, tier) => 
                 sum + monthlyData[11].activeClients[tier].saber + monthlyData[11].activeBaseExpansions[tier].saber, 0) : 0}
+              format="number"
+              className="bg-primary/20 font-bold"
+            />
+          </div>
+
+          <div className="flex row-hover bg-primary/10">
+            <RowHeader label="Total Clientes Ter (All)" tooltip="Todos clientes Ter (aquisição + expansão)" className="pl-4 font-bold" />
+            {monthlyData.map((m, i) => {
+              const total = TIERS.reduce((sum, tier) => 
+                sum + m.activeClients[tier].ter + m.activeBaseExpansions[tier].ter, 0);
+              return <SpreadsheetCell key={i} value={total} format="number" className="font-semibold" />;
+            })}
+            <SpreadsheetCell
+              value={monthlyData[11] ? TIERS.reduce((sum, tier) => 
+                sum + monthlyData[11].activeClients[tier].ter + monthlyData[11].activeBaseExpansions[tier].ter, 0) : 0}
               format="number"
               className="bg-primary/20 font-bold"
             />
@@ -2774,6 +2960,67 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             />
           </div>
 
+          {/* Sales guidance (SDR / Closers) - não contam no totalHC */}
+          <div className="flex row-hover">
+            <RowHeader label="# Sales: SDR Required" tooltip="Número de SDRs estimado (200 MQL / SDR)" className="pl-6" />
+            {monthlyData.map((m, i) => (
+              <SpreadsheetCell key={i} value={m.capacityPlan.salesSDRRequired ?? 0} format="number" />
+            ))}
+            <SpreadsheetCell
+              value={monthlyData.reduce((sum, m) => sum + (m.capacityPlan.salesSDRRequired ?? 0), 0)}
+              format="number"
+              className="bg-primary/10"
+            />
+          </div>
+
+          <div className="flex row-hover">
+            <RowHeader label="# Sales: Closers Required" tooltip="Número de Closers estimado (50 SAL / Closer)" className="pl-6" />
+            {monthlyData.map((m, i) => (
+              <SpreadsheetCell key={i} value={m.capacityPlan.salesClosersRequired ?? 0} format="number" />
+            ))}
+            <SpreadsheetCell
+              value={monthlyData.reduce((sum, m) => sum + (m.capacityPlan.salesClosersRequired ?? 0), 0)}
+              format="number"
+              className="bg-primary/10"
+            />
+          </div>
+
+          <div className="flex row-hover">
+            <RowHeader label="# Sales: Current SDR" tooltip="SDRs atuais (para comparação)" className="pl-6" />
+            {monthlyData.map((m, i) => (
+              <SpreadsheetCell key={i} value={m.capacityPlan.salesCurrentSDR ?? 0} format="number" />
+            ))}
+            <SpreadsheetCell
+              value={monthlyData.reduce((sum, m) => sum + (m.capacityPlan.salesCurrentSDR ?? 0), 0)}
+              format="number"
+              className="bg-primary/10"
+            />
+          </div>
+
+          <div className="flex row-hover">
+            <RowHeader label="# Sales: Current Closers" tooltip="Closers atuais (para comparação)" className="pl-6" />
+            {monthlyData.map((m, i) => (
+              <SpreadsheetCell key={i} value={m.capacityPlan.salesCurrentClosers ?? 0} format="number" />
+            ))}
+            <SpreadsheetCell
+              value={monthlyData.reduce((sum, m) => sum + (m.capacityPlan.salesCurrentClosers ?? 0), 0)}
+              format="number"
+              className="bg-primary/10"
+            />
+          </div>
+
+          <div className="flex row-hover bg-blue-100">
+            <RowHeader label="# Contratações Sales" tooltip="Orientação de contratações para vendas (SDR+Closer)" className="pl-6 font-semibold" />
+            {monthlyData.map((m, i) => (
+              <SpreadsheetCell key={i} value={m.capacityPlan.salesHires ?? 0} format="number" className="font-semibold" />
+            ))}
+            <SpreadsheetCell
+              value={monthlyData.reduce((sum, m) => sum + (m.capacityPlan.salesHires ?? 0), 0)}
+              format="number"
+              className="bg-blue-200 font-semibold"
+            />
+          </div>
+
           <div className="flex row-hover">
             <RowHeader label="$ Receita Saber" tooltip="Receita total do squad Saber (vinculada com Total Saber All)" className="pl-6" />
             {monthlyData.map((m, i) => {
@@ -2915,7 +3162,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, inadimplenciaRate: val } })}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={inputs.dreConfig.inadimplenciaRate} format="percentage" className="bg-primary/10" />
               </div>
 
               <div className="flex row-hover">
@@ -2929,7 +3176,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, churnM0FalconsRate: val } })}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={inputs.dreConfig.churnM0FalconsRate} format="percentage" className="bg-primary/10" />
               </div>
 
               <div className="flex row-hover">
@@ -2943,7 +3190,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, churnRecebimentoOPSRate: val } })}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={inputs.dreConfig.churnRecebimentoOPSRate} format="percentage" className="bg-primary/10" />
               </div>
 
               <div className="flex row-hover">
@@ -2957,7 +3204,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, royaltiesRate: val } })}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={inputs.dreConfig.royaltiesRate} format="percentage" className="bg-primary/10" />
               </div>
 
               <div className="flex row-hover">
@@ -2971,7 +3218,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, issRate: val } })}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={inputs.dreConfig.issRate} format="percentage" className="bg-primary/10" />
               </div>
 
               <div className="flex row-hover">
@@ -2985,7 +3232,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, irrfRate: val } })}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={inputs.dreConfig.irrfRate} format="percentage" className="bg-primary/10" />
               </div>
 
               <div className="flex row-hover">
@@ -2999,7 +3246,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, pisRate: val } })}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={inputs.dreConfig.pisRate} format="percentage" className="bg-primary/10" />
               </div>
 
               <div className="flex row-hover">
@@ -3013,7 +3260,35 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cofinsRate: val } })}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={inputs.dreConfig.cofinsRate} format="percentage" className="bg-primary/10" />
+              </div>
+
+              <div className="flex row-hover">
+                <RowHeader label="Equipe Comercial - SDRs (atuais)" className="pl-4" tooltip="Número atual de SDRs na equipe" />
+                {[...Array(12)].map((_, i) => (
+                  <SpreadsheetCell
+                    key={i}
+                    value={inputs.dreConfig.currentSDR ?? 1}
+                    format="number"
+                    editable
+                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, currentSDR: Math.max(0, Math.round(val)) } })}
+                  />
+                ))}
+                <SpreadsheetCell value={inputs.dreConfig.currentSDR ?? 1} format="number" className="bg-primary/10" />
+              </div>
+
+              <div className="flex row-hover">
+                <RowHeader label="Equipe Comercial - Closers (atuais)" className="pl-4" tooltip="Número atual de Closers na equipe" />
+                {[...Array(12)].map((_, i) => (
+                  <SpreadsheetCell
+                    key={i}
+                    value={inputs.dreConfig.currentClosers ?? 2}
+                    format="number"
+                    editable
+                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, currentClosers: Math.max(0, Math.round(val)) } })}
+                  />
+                ))}
+                <SpreadsheetCell value={inputs.dreConfig.currentClosers ?? 2} format="number" className="bg-primary/10" />
               </div>
 
               <div className="flex row-hover">
@@ -3027,7 +3302,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, despesasFinanceirasRate: val } })}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={inputs.dreConfig.despesasFinanceirasRate} format="percentage" className="bg-primary/10" />
               </div>
 
               <div className="flex row-hover">
@@ -3041,7 +3316,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, irpjRate: val } })}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={inputs.dreConfig.irpjRate} format="percentage" className="bg-primary/10" />
               </div>
 
               <div className="flex row-hover">
@@ -3055,8 +3330,279 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, csllRate: val } })}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={inputs.dreConfig.csllRate} format="percentage" className="bg-primary/10" />
               </div>
+
+              {/* === SALES CONFIG SECTION === */}
+              <div className="flex mt-6">
+                <RowHeader 
+                  label="CONFIGURAÇÃO COMERCIAL & MARKETING" 
+                  level="section"
+                  expanded={expandedSections.salesConfig}
+                  onToggle={() => toggleSection('salesConfig')}
+                />
+                {[...Array(13)].map((_, i) => (
+                  <div key={i} className="spreadsheet-cell bg-primary/10" />
+                ))}
+              </div>
+
+              {expandedSections.salesConfig && (
+                <>
+                  {/* Taxas de Comissão */}
+                  <div className="flex">
+                    <RowHeader label="Taxas de Comissão" level="tier" tier="enterprise" />
+                    {[...Array(13)].map((_, i) => (
+                      <div key={i} className="spreadsheet-cell tier-enterprise" />
+                    ))}
+                  </div>
+
+                  <div className="flex row-hover">
+                    <RowHeader label="Comissão Ativação (%)" className="pl-4" tooltip="Percentual de comissão sobre receita de ativação (novas vendas)" />
+                    {[...Array(12)].map((_, i) => (
+                      <SpreadsheetCell
+                        key={i}
+                        value={inputs.salesConfig.comissaoActivationRate}
+                        format="percentage"
+                        editable
+                        onChange={(val) => onUpdate({ ...inputs, salesConfig: { ...inputs.salesConfig, comissaoActivationRate: val } })}
+                      />
+                    ))}
+                    <SpreadsheetCell value={inputs.salesConfig.comissaoActivationRate} format="percentage" className="bg-primary/10" />
+                  </div>
+
+                  <div className="flex row-hover">
+                    <RowHeader label="Comissão Expansion (%)" className="pl-4" tooltip="Percentual de comissão sobre receita de expansão (farmers)" />
+                    {[...Array(12)].map((_, i) => (
+                      <SpreadsheetCell
+                        key={i}
+                        value={inputs.salesConfig.comissaoExpansionRate}
+                        format="percentage"
+                        editable
+                        onChange={(val) => onUpdate({ ...inputs, salesConfig: { ...inputs.salesConfig, comissaoExpansionRate: val } })}
+                      />
+                    ))}
+                    <SpreadsheetCell value={inputs.salesConfig.comissaoExpansionRate} format="percentage" className="bg-primary/10" />
+                  </div>
+
+                  {/* Produtividade & Salários - Closers */}
+                  <div className="flex mt-2">
+                    <RowHeader label="Closers" level="tier" tier="large" />
+                    {[...Array(13)].map((_, i) => (
+                      <div key={i} className="spreadsheet-cell tier-large" />
+                    ))}
+                  </div>
+
+                  <div className="flex row-hover">
+                    <RowHeader label="Produtividade (WONs/mês)" className="pl-4" tooltip="Quantidade de WONs por closer por mês" />
+                    {[...Array(12)].map((_, i) => (
+                      <SpreadsheetCell
+                        key={i}
+                        value={inputs.salesConfig.closerProductivity}
+                        format="number"
+                        editable
+                        onChange={(val) => onUpdate({ ...inputs, salesConfig: { ...inputs.salesConfig, closerProductivity: Math.max(1, Math.round(val)) } })}
+                      />
+                    ))}
+                    <SpreadsheetCell value={inputs.salesConfig.closerProductivity} format="number" className="bg-primary/10" />
+                  </div>
+
+                  <div className="flex row-hover">
+                    <RowHeader label="Salário Mensal (R$)" className="pl-4" tooltip="Salário mensal por closer" />
+                    {[...Array(12)].map((_, i) => (
+                      <SpreadsheetCell
+                        key={i}
+                        value={inputs.salesConfig.closerSalary}
+                        format="currency"
+                        editable
+                        onChange={(val) => onUpdate({ ...inputs, salesConfig: { ...inputs.salesConfig, closerSalary: val } })}
+                      />
+                    ))}
+                    <SpreadsheetCell value={inputs.salesConfig.closerSalary} format="currency" className="bg-primary/10" />
+                  </div>
+
+                  {/* Produtividade & Salários - SDRs */}
+                  <div className="flex mt-2">
+                    <RowHeader label="SDRs" level="tier" tier="large" />
+                    {[...Array(13)].map((_, i) => (
+                      <div key={i} className="spreadsheet-cell tier-large" />
+                    ))}
+                  </div>
+
+                  <div className="flex row-hover">
+                    <RowHeader label="Produtividade (SQLs/mês)" className="pl-4" tooltip="Quantidade de SQLs por SDR por mês" />
+                    {[...Array(12)].map((_, i) => (
+                      <SpreadsheetCell
+                        key={i}
+                        value={inputs.salesConfig.sdrProductivity}
+                        format="number"
+                        editable
+                        onChange={(val) => onUpdate({ ...inputs, salesConfig: { ...inputs.salesConfig, sdrProductivity: Math.max(1, Math.round(val)) } })}
+                      />
+                    ))}
+                    <SpreadsheetCell value={inputs.salesConfig.sdrProductivity} format="number" className="bg-primary/10" />
+                  </div>
+
+                  <div className="flex row-hover">
+                    <RowHeader label="Salário Mensal (R$)" className="pl-4" tooltip="Salário mensal por SDR" />
+                    {[...Array(12)].map((_, i) => (
+                      <SpreadsheetCell
+                        key={i}
+                        value={inputs.salesConfig.sdrSalary}
+                        format="currency"
+                        editable
+                        onChange={(val) => onUpdate({ ...inputs, salesConfig: { ...inputs.salesConfig, sdrSalary: val } })}
+                      />
+                    ))}
+                    <SpreadsheetCell value={inputs.salesConfig.sdrSalary} format="currency" className="bg-primary/10" />
+                  </div>
+
+                  {/* Produtividade & Salários - Farmers */}
+                  <div className="flex mt-2">
+                    <RowHeader label="Farmers (CS)" level="tier" tier="large" />
+                    {[...Array(13)].map((_, i) => (
+                      <div key={i} className="spreadsheet-cell tier-large" />
+                    ))}
+                  </div>
+
+                  <div className="flex row-hover">
+                    <RowHeader label="Produtividade (Clientes/mês)" className="pl-4" tooltip="Quantidade de clientes ativos por farmer" />
+                    {[...Array(12)].map((_, i) => (
+                      <SpreadsheetCell
+                        key={i}
+                        value={inputs.salesConfig.farmerProductivity}
+                        format="number"
+                        editable
+                        onChange={(val) => onUpdate({ ...inputs, salesConfig: { ...inputs.salesConfig, farmerProductivity: Math.max(1, Math.round(val)) } })}
+                      />
+                    ))}
+                    <SpreadsheetCell value={inputs.salesConfig.farmerProductivity} format="number" className="bg-primary/10" />
+                  </div>
+
+                  <div className="flex row-hover">
+                    <RowHeader label="Salário Mensal (R$)" className="pl-4" tooltip="Salário mensal por farmer" />
+                    {[...Array(12)].map((_, i) => (
+                      <SpreadsheetCell
+                        key={i}
+                        value={inputs.salesConfig.farmerSalary}
+                        format="currency"
+                        editable
+                        onChange={(val) => onUpdate({ ...inputs, salesConfig: { ...inputs.salesConfig, farmerSalary: val } })}
+                      />
+                    ))}
+                    <SpreadsheetCell value={inputs.salesConfig.farmerSalary} format="currency" className="bg-primary/10" />
+                  </div>
+
+                  {/* Despesas Fixas */}
+                  <div className="flex mt-2">
+                    <RowHeader label="Despesas Fixas" level="tier" tier="medium" />
+                    {[...Array(13)].map((_, i) => (
+                      <div key={i} className="spreadsheet-cell tier-medium" />
+                    ))}
+                  </div>
+
+                  <div className="flex row-hover">
+                    <RowHeader label="Folha Gestão Comercial" className="pl-4" tooltip="Despesas com gestão comercial" />
+                    {[...Array(12)].map((_, i) => (
+                      <SpreadsheetCell
+                        key={i}
+                        value={inputs.salesConfig.folhaGestaoComercial}
+                        format="currency"
+                        editable
+                        onChange={(val) => onUpdate({ ...inputs, salesConfig: { ...inputs.salesConfig, folhaGestaoComercial: val } })}
+                      />
+                    ))}
+                    <SpreadsheetCell value={inputs.salesConfig.folhaGestaoComercial * 12} format="currency" className="bg-primary/10 font-semibold" />
+                  </div>
+
+                  <div className="flex row-hover">
+                    <RowHeader label="Bônus Campanhas (Activation)" className="pl-4" tooltip="Bônus e campanhas para ativação" />
+                    {[...Array(12)].map((_, i) => (
+                      <SpreadsheetCell
+                        key={i}
+                        value={inputs.salesConfig.bonusCampanhasActivation}
+                        format="currency"
+                        editable
+                        onChange={(val) => onUpdate({ ...inputs, salesConfig: { ...inputs.salesConfig, bonusCampanhasActivation: val } })}
+                      />
+                    ))}
+                    <SpreadsheetCell value={inputs.salesConfig.bonusCampanhasActivation * 12} format="currency" className="bg-primary/10 font-semibold" />
+                  </div>
+
+                  <div className="flex row-hover">
+                    <RowHeader label="Estrutura Suporte" className="pl-4" tooltip="Despesas com estrutura de suporte (varia por mês)" />
+                    {[...Array(12)].map((_, i) => (
+                      <SpreadsheetCell
+                        key={i}
+                        value={inputs.salesConfig.estruturaSuporte[i]}
+                        format="currency"
+                        editable
+                        onChange={(val) => {
+                          const newArray = [...inputs.salesConfig.estruturaSuporte];
+                          newArray[i] = val;
+                          onUpdate({ ...inputs, salesConfig: { ...inputs.salesConfig, estruturaSuporte: newArray } });
+                        }}
+                      />
+                    ))}
+                    <SpreadsheetCell value={inputs.salesConfig.estruturaSuporte.reduce((a, b) => a + b, 0)} format="currency" className="bg-primary/10 font-semibold" />
+                  </div>
+
+                  <div className="flex row-hover">
+                    <RowHeader label="Despesas Visitas (Activation)" className="pl-4" tooltip="Despesas com visitas para ativação" />
+                    {[...Array(12)].map((_, i) => (
+                      <SpreadsheetCell
+                        key={i}
+                        value={inputs.salesConfig.despesasVisitasActivation}
+                        format="currency"
+                        editable
+                        onChange={(val) => onUpdate({ ...inputs, salesConfig: { ...inputs.salesConfig, despesasVisitasActivation: val } })}
+                      />
+                    ))}
+                    <SpreadsheetCell value={inputs.salesConfig.despesasVisitasActivation * 12} format="currency" className="bg-primary/10 font-semibold" />
+                  </div>
+
+                  <div className="flex row-hover">
+                    <RowHeader label="Bônus Campanhas (Expansion)" className="pl-4" tooltip="Bônus e campanhas para expansão" />
+                    {[...Array(12)].map((_, i) => (
+                      <SpreadsheetCell
+                        key={i}
+                        value={inputs.salesConfig.bonusCampanhasExpansion}
+                        format="currency"
+                        editable
+                        onChange={(val) => onUpdate({ ...inputs, salesConfig: { ...inputs.salesConfig, bonusCampanhasExpansion: val } })}
+                      />
+                    ))}
+                    <SpreadsheetCell value={inputs.salesConfig.bonusCampanhasExpansion * 12} format="currency" className="bg-primary/10 font-semibold" />
+                  </div>
+
+                  <div className="flex row-hover">
+                    <RowHeader label="Comissão Operação" className="pl-4" tooltip="Comissão da operação" />
+                    {[...Array(12)].map((_, i) => (
+                      <SpreadsheetCell
+                        key={i}
+                        value={inputs.salesConfig.comissaoOperacao}
+                        format="currency"
+                        editable
+                        onChange={(val) => onUpdate({ ...inputs, salesConfig: { ...inputs.salesConfig, comissaoOperacao: val } })}
+                      />
+                    ))}
+                    <SpreadsheetCell value={inputs.salesConfig.comissaoOperacao * 12} format="currency" className="bg-primary/10 font-semibold" />
+                  </div>
+
+                  <div className="flex row-hover">
+                    <RowHeader label="Despesas Visitas (Expansion)" className="pl-4" tooltip="Despesas com visitas para expansão" />
+                    {[...Array(12)].map((_, i) => (
+                      <SpreadsheetCell
+                        key={i}
+                        value={inputs.salesConfig.despesasVisitasExpansion}
+                        format="currency"
+                        editable
+                        onChange={(val) => onUpdate({ ...inputs, salesConfig: { ...inputs.salesConfig, despesasVisitasExpansion: val } })}
+                      />
+                    ))}
+                    <SpreadsheetCell value={inputs.salesConfig.despesasVisitasExpansion * 12} format="currency" className="bg-primary/10 font-semibold" />
+                  </div>
+                </>
+              )}
 
               {/* Parâmetros CSP - Squad Model */}
               <div className="flex mt-4">
@@ -3080,13 +3626,19 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 {[...Array(12)].map((_, i) => (
                   <SpreadsheetCell
                     key={i}
-                    value={inputs.dreConfig.cspExecutarCoordenador}
+                    value={getMonthlyValue(inputs.dreConfig.cspExecutarCoordenador, i)}
                     format="currency"
                     editable
-                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspExecutarCoordenador: val } })}
+                    onChange={(val) => {
+                      const newValue = Array.isArray(inputs.dreConfig.cspExecutarCoordenador)
+                        ? [...inputs.dreConfig.cspExecutarCoordenador]
+                        : Array(12).fill(inputs.dreConfig.cspExecutarCoordenador);
+                      newValue[i] = val;
+                      onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspExecutarCoordenador: newValue } });
+                    }}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={getMonthlyValue(inputs.dreConfig.cspExecutarCoordenador, 11)} format="currency" className="bg-primary/10 font-semibold" />
               </div>
 
               <div className="flex row-hover">
@@ -3094,13 +3646,19 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 {[...Array(12)].map((_, i) => (
                   <SpreadsheetCell
                     key={i}
-                    value={inputs.dreConfig.cspExecutarAccountSr}
+                    value={getMonthlyValue(inputs.dreConfig.cspExecutarAccountSr, i)}
                     format="currency"
                     editable
-                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspExecutarAccountSr: val } })}
+                    onChange={(val) => {
+                      const newValue = Array.isArray(inputs.dreConfig.cspExecutarAccountSr)
+                        ? [...inputs.dreConfig.cspExecutarAccountSr]
+                        : Array(12).fill(inputs.dreConfig.cspExecutarAccountSr);
+                      newValue[i] = val;
+                      onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspExecutarAccountSr: newValue } });
+                    }}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={getMonthlyValue(inputs.dreConfig.cspExecutarAccountSr, 11)} format="currency" className="bg-primary/10 font-semibold" />
               </div>
 
               <div className="flex row-hover">
@@ -3108,13 +3666,19 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 {[...Array(12)].map((_, i) => (
                   <SpreadsheetCell
                     key={i}
-                    value={inputs.dreConfig.cspExecutarGestorTrafegoSr}
+                    value={getMonthlyValue(inputs.dreConfig.cspExecutarGestorTrafegoSr, i)}
                     format="currency"
                     editable
-                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspExecutarGestorTrafegoSr: val } })}
+                    onChange={(val) => {
+                      const newValue = Array.isArray(inputs.dreConfig.cspExecutarGestorTrafegoSr)
+                        ? [...inputs.dreConfig.cspExecutarGestorTrafegoSr]
+                        : Array(12).fill(inputs.dreConfig.cspExecutarGestorTrafegoSr);
+                      newValue[i] = val;
+                      onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspExecutarGestorTrafegoSr: newValue } });
+                    }}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={getMonthlyValue(inputs.dreConfig.cspExecutarGestorTrafegoSr, 11)} format="currency" className="bg-primary/10 font-semibold" />
               </div>
 
               <div className="flex row-hover">
@@ -3122,13 +3686,19 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 {[...Array(12)].map((_, i) => (
                   <SpreadsheetCell
                     key={i}
-                    value={inputs.dreConfig.cspExecutarGestorTrafegoPl}
+                    value={getMonthlyValue(inputs.dreConfig.cspExecutarGestorTrafegoPl, i)}
                     format="currency"
                     editable
-                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspExecutarGestorTrafegoPl: val } })}
+                    onChange={(val) => {
+                      const newValue = Array.isArray(inputs.dreConfig.cspExecutarGestorTrafegoPl)
+                        ? [...inputs.dreConfig.cspExecutarGestorTrafegoPl]
+                        : Array(12).fill(inputs.dreConfig.cspExecutarGestorTrafegoPl);
+                      newValue[i] = val;
+                      onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspExecutarGestorTrafegoPl: newValue } });
+                    }}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={getMonthlyValue(inputs.dreConfig.cspExecutarGestorTrafegoPl, 11)} format="currency" className="bg-primary/10 font-semibold" />
               </div>
 
               <div className="flex row-hover">
@@ -3136,13 +3706,19 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 {[...Array(12)].map((_, i) => (
                   <SpreadsheetCell
                     key={i}
-                    value={inputs.dreConfig.cspExecutarCopywriter}
+                    value={getMonthlyValue(inputs.dreConfig.cspExecutarCopywriter, i)}
                     format="currency"
                     editable
-                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspExecutarCopywriter: val } })}
+                    onChange={(val) => {
+                      const newValue = Array.isArray(inputs.dreConfig.cspExecutarCopywriter)
+                        ? [...inputs.dreConfig.cspExecutarCopywriter]
+                        : Array(12).fill(inputs.dreConfig.cspExecutarCopywriter);
+                      newValue[i] = val;
+                      onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspExecutarCopywriter: newValue } });
+                    }}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={getMonthlyValue(inputs.dreConfig.cspExecutarCopywriter, 11)} format="currency" className="bg-primary/10 font-semibold" />
               </div>
 
               <div className="flex row-hover">
@@ -3150,13 +3726,19 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 {[...Array(12)].map((_, i) => (
                   <SpreadsheetCell
                     key={i}
-                    value={inputs.dreConfig.cspExecutarDesignerSr}
+                    value={getMonthlyValue(inputs.dreConfig.cspExecutarDesignerSr, i)}
                     format="currency"
                     editable
-                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspExecutarDesignerSr: val } })}
+                    onChange={(val) => {
+                      const newValue = Array.isArray(inputs.dreConfig.cspExecutarDesignerSr)
+                        ? [...inputs.dreConfig.cspExecutarDesignerSr]
+                        : Array(12).fill(inputs.dreConfig.cspExecutarDesignerSr);
+                      newValue[i] = val;
+                      onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspExecutarDesignerSr: newValue } });
+                    }}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={getMonthlyValue(inputs.dreConfig.cspExecutarDesignerSr, 11)} format="currency" className="bg-primary/10 font-semibold" />
               </div>
 
               <div className="flex row-hover">
@@ -3164,13 +3746,19 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 {[...Array(12)].map((_, i) => (
                   <SpreadsheetCell
                     key={i}
-                    value={inputs.dreConfig.cspExecutarDesignerPl}
+                    value={getMonthlyValue(inputs.dreConfig.cspExecutarDesignerPl, i)}
                     format="currency"
                     editable
-                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspExecutarDesignerPl: val } })}
+                    onChange={(val) => {
+                      const newValue = Array.isArray(inputs.dreConfig.cspExecutarDesignerPl)
+                        ? [...inputs.dreConfig.cspExecutarDesignerPl]
+                        : Array(12).fill(inputs.dreConfig.cspExecutarDesignerPl);
+                      newValue[i] = val;
+                      onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspExecutarDesignerPl: newValue } });
+                    }}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={getMonthlyValue(inputs.dreConfig.cspExecutarDesignerPl, 11)} format="currency" className="bg-primary/10 font-semibold" />
               </div>
 
               <div className="flex row-hover">
@@ -3178,27 +3766,33 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 {[...Array(12)].map((_, i) => (
                   <SpreadsheetCell
                     key={i}
-                    value={inputs.dreConfig.cspExecutarSocialMedia}
+                    value={getMonthlyValue(inputs.dreConfig.cspExecutarSocialMedia, i)}
                     format="currency"
                     editable
-                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspExecutarSocialMedia: val } })}
+                    onChange={(val) => {
+                      const newValue = Array.isArray(inputs.dreConfig.cspExecutarSocialMedia)
+                        ? [...inputs.dreConfig.cspExecutarSocialMedia]
+                        : Array(12).fill(inputs.dreConfig.cspExecutarSocialMedia);
+                      newValue[i] = val;
+                      onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspExecutarSocialMedia: newValue } });
+                    }}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={getMonthlyValue(inputs.dreConfig.cspExecutarSocialMedia, 11)} format="currency" className="bg-primary/10 font-semibold" />
               </div>
 
               {/* Total Squad Executar */}
               <div className="flex row-hover bg-primary/5">
                 <RowHeader label="Total Squad Executar (mensal)" className="pl-8 font-semibold" />
                 {[...Array(12)].map((_, i) => {
-                  const total = inputs.dreConfig.cspExecutarCoordenador +
-                                (inputs.dreConfig.cspExecutarAccountSr * 2) +
-                                inputs.dreConfig.cspExecutarGestorTrafegoSr +
-                                inputs.dreConfig.cspExecutarGestorTrafegoPl +
-                                inputs.dreConfig.cspExecutarCopywriter +
-                                inputs.dreConfig.cspExecutarDesignerSr +
-                                inputs.dreConfig.cspExecutarDesignerPl +
-                                inputs.dreConfig.cspExecutarSocialMedia;
+                  const total = getMonthlyValue(inputs.dreConfig.cspExecutarCoordenador, i) +
+                                (getMonthlyValue(inputs.dreConfig.cspExecutarAccountSr, i) * 2) +
+                                getMonthlyValue(inputs.dreConfig.cspExecutarGestorTrafegoSr, i) +
+                                getMonthlyValue(inputs.dreConfig.cspExecutarGestorTrafegoPl, i) +
+                                getMonthlyValue(inputs.dreConfig.cspExecutarCopywriter, i) +
+                                getMonthlyValue(inputs.dreConfig.cspExecutarDesignerSr, i) +
+                                getMonthlyValue(inputs.dreConfig.cspExecutarDesignerPl, i) +
+                                getMonthlyValue(inputs.dreConfig.cspExecutarSocialMedia, i);
                   return (
                     <SpreadsheetCell
                       key={i}
@@ -3208,7 +3802,18 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     />
                   );
                 })}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell 
+                  value={getMonthlyValue(inputs.dreConfig.cspExecutarCoordenador, 11) +
+                        (getMonthlyValue(inputs.dreConfig.cspExecutarAccountSr, 11) * 2) +
+                        getMonthlyValue(inputs.dreConfig.cspExecutarGestorTrafegoSr, 11) +
+                        getMonthlyValue(inputs.dreConfig.cspExecutarGestorTrafegoPl, 11) +
+                        getMonthlyValue(inputs.dreConfig.cspExecutarCopywriter, 11) +
+                        getMonthlyValue(inputs.dreConfig.cspExecutarDesignerSr, 11) +
+                        getMonthlyValue(inputs.dreConfig.cspExecutarDesignerPl, 11) +
+                        getMonthlyValue(inputs.dreConfig.cspExecutarSocialMedia, 11)} 
+                  format="currency" 
+                  className="bg-primary/10 font-semibold" 
+                />
               </div>
 
               {/* SQUAD SABER - Header */}
@@ -3225,13 +3830,19 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 {[...Array(12)].map((_, i) => (
                   <SpreadsheetCell
                     key={i}
-                    value={inputs.dreConfig.cspSaberCoordenador}
+                    value={getMonthlyValue(inputs.dreConfig.cspSaberCoordenador, i)}
                     format="currency"
                     editable
-                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspSaberCoordenador: val } })}
+                    onChange={(val) => {
+                      const newValue = Array.isArray(inputs.dreConfig.cspSaberCoordenador)
+                        ? [...inputs.dreConfig.cspSaberCoordenador]
+                        : Array(12).fill(inputs.dreConfig.cspSaberCoordenador);
+                      newValue[i] = val;
+                      onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspSaberCoordenador: newValue } });
+                    }}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={getMonthlyValue(inputs.dreConfig.cspSaberCoordenador, 11)} format="currency" className="bg-primary/10 font-semibold" />
               </div>
 
               <div className="flex row-hover">
@@ -3239,13 +3850,19 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 {[...Array(12)].map((_, i) => (
                   <SpreadsheetCell
                     key={i}
-                    value={inputs.dreConfig.cspSaberAccountSr}
+                    value={getMonthlyValue(inputs.dreConfig.cspSaberAccountSr, i)}
                     format="currency"
                     editable
-                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspSaberAccountSr: val } })}
+                    onChange={(val) => {
+                      const newValue = Array.isArray(inputs.dreConfig.cspSaberAccountSr)
+                        ? [...inputs.dreConfig.cspSaberAccountSr]
+                        : Array(12).fill(inputs.dreConfig.cspSaberAccountSr);
+                      newValue[i] = val;
+                      onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspSaberAccountSr: newValue } });
+                    }}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={getMonthlyValue(inputs.dreConfig.cspSaberAccountSr, 11)} format="currency" className="bg-primary/10 font-semibold" />
               </div>
 
               <div className="flex row-hover">
@@ -3253,13 +3870,19 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 {[...Array(12)].map((_, i) => (
                   <SpreadsheetCell
                     key={i}
-                    value={inputs.dreConfig.cspSaberAccountPl}
+                    value={getMonthlyValue(inputs.dreConfig.cspSaberAccountPl, i)}
                     format="currency"
                     editable
-                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspSaberAccountPl: val } })}
+                    onChange={(val) => {
+                      const newValue = Array.isArray(inputs.dreConfig.cspSaberAccountPl)
+                        ? [...inputs.dreConfig.cspSaberAccountPl]
+                        : Array(12).fill(inputs.dreConfig.cspSaberAccountPl);
+                      newValue[i] = val;
+                      onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspSaberAccountPl: newValue } });
+                    }}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={getMonthlyValue(inputs.dreConfig.cspSaberAccountPl, 11)} format="currency" className="bg-primary/10 font-semibold" />
               </div>
 
               <div className="flex row-hover">
@@ -3267,13 +3890,19 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 {[...Array(12)].map((_, i) => (
                   <SpreadsheetCell
                     key={i}
-                    value={inputs.dreConfig.cspSaberAccountJr}
+                    value={getMonthlyValue(inputs.dreConfig.cspSaberAccountJr, i)}
                     format="currency"
                     editable
-                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspSaberAccountJr: val } })}
+                    onChange={(val) => {
+                      const newValue = Array.isArray(inputs.dreConfig.cspSaberAccountJr)
+                        ? [...inputs.dreConfig.cspSaberAccountJr]
+                        : Array(12).fill(inputs.dreConfig.cspSaberAccountJr);
+                      newValue[i] = val;
+                      onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspSaberAccountJr: newValue } });
+                    }}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={getMonthlyValue(inputs.dreConfig.cspSaberAccountJr, 11)} format="currency" className="bg-primary/10 font-semibold" />
               </div>
 
               <div className="flex row-hover">
@@ -3281,13 +3910,19 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 {[...Array(12)].map((_, i) => (
                   <SpreadsheetCell
                     key={i}
-                    value={inputs.dreConfig.cspSaberGestorTrafegoPl}
+                    value={getMonthlyValue(inputs.dreConfig.cspSaberGestorTrafegoPl, i)}
                     format="currency"
                     editable
-                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspSaberGestorTrafegoPl: val } })}
+                    onChange={(val) => {
+                      const newValue = Array.isArray(inputs.dreConfig.cspSaberGestorTrafegoPl)
+                        ? [...inputs.dreConfig.cspSaberGestorTrafegoPl]
+                        : Array(12).fill(inputs.dreConfig.cspSaberGestorTrafegoPl);
+                      newValue[i] = val;
+                      onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspSaberGestorTrafegoPl: newValue } });
+                    }}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={getMonthlyValue(inputs.dreConfig.cspSaberGestorTrafegoPl, 11)} format="currency" className="bg-primary/10 font-semibold" />
               </div>
 
               <div className="flex row-hover">
@@ -3295,13 +3930,19 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 {[...Array(12)].map((_, i) => (
                   <SpreadsheetCell
                     key={i}
-                    value={inputs.dreConfig.cspSaberCopywriter}
+                    value={getMonthlyValue(inputs.dreConfig.cspSaberCopywriter, i)}
                     format="currency"
                     editable
-                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspSaberCopywriter: val } })}
+                    onChange={(val) => {
+                      const newValue = Array.isArray(inputs.dreConfig.cspSaberCopywriter)
+                        ? [...inputs.dreConfig.cspSaberCopywriter]
+                        : Array(12).fill(inputs.dreConfig.cspSaberCopywriter);
+                      newValue[i] = val;
+                      onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspSaberCopywriter: newValue } });
+                    }}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={getMonthlyValue(inputs.dreConfig.cspSaberCopywriter, 11)} format="currency" className="bg-primary/10 font-semibold" />
               </div>
 
               <div className="flex row-hover">
@@ -3309,13 +3950,19 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 {[...Array(12)].map((_, i) => (
                   <SpreadsheetCell
                     key={i}
-                    value={inputs.dreConfig.cspSaberDesignerSr}
+                    value={getMonthlyValue(inputs.dreConfig.cspSaberDesignerSr, i)}
                     format="currency"
                     editable
-                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspSaberDesignerSr: val } })}
+                    onChange={(val) => {
+                      const newValue = Array.isArray(inputs.dreConfig.cspSaberDesignerSr)
+                        ? [...inputs.dreConfig.cspSaberDesignerSr]
+                        : Array(12).fill(inputs.dreConfig.cspSaberDesignerSr);
+                      newValue[i] = val;
+                      onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspSaberDesignerSr: newValue } });
+                    }}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={getMonthlyValue(inputs.dreConfig.cspSaberDesignerSr, 11)} format="currency" className="bg-primary/10 font-semibold" />
               </div>
 
               <div className="flex row-hover">
@@ -3323,13 +3970,19 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 {[...Array(12)].map((_, i) => (
                   <SpreadsheetCell
                     key={i}
-                    value={inputs.dreConfig.cspSaberTech}
+                    value={getMonthlyValue(inputs.dreConfig.cspSaberTech, i)}
                     format="currency"
                     editable
-                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspSaberTech: val } })}
+                    onChange={(val) => {
+                      const newValue = Array.isArray(inputs.dreConfig.cspSaberTech)
+                        ? [...inputs.dreConfig.cspSaberTech]
+                        : Array(12).fill(inputs.dreConfig.cspSaberTech);
+                      newValue[i] = val;
+                      onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspSaberTech: newValue } });
+                    }}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={getMonthlyValue(inputs.dreConfig.cspSaberTech, 11)} format="currency" className="bg-primary/10 font-semibold" />
               </div>
 
               <div className="flex row-hover">
@@ -3337,28 +3990,34 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 {[...Array(12)].map((_, i) => (
                   <SpreadsheetCell
                     key={i}
-                    value={inputs.dreConfig.cspSaberSalesEnablement}
+                    value={getMonthlyValue(inputs.dreConfig.cspSaberSalesEnablement, i)}
                     format="currency"
                     editable
-                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspSaberSalesEnablement: val } })}
+                    onChange={(val) => {
+                      const newValue = Array.isArray(inputs.dreConfig.cspSaberSalesEnablement)
+                        ? [...inputs.dreConfig.cspSaberSalesEnablement]
+                        : Array(12).fill(inputs.dreConfig.cspSaberSalesEnablement);
+                      newValue[i] = val;
+                      onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspSaberSalesEnablement: newValue } });
+                    }}
                   />
                 ))}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell value={getMonthlyValue(inputs.dreConfig.cspSaberSalesEnablement, 11)} format="currency" className="bg-primary/10 font-semibold" />
               </div>
 
               {/* Total Squad Saber */}
               <div className="flex row-hover bg-primary/5">
                 <RowHeader label="Total Squad Saber (mensal)" className="pl-8 font-semibold" />
                 {[...Array(12)].map((_, i) => {
-                  const total = inputs.dreConfig.cspSaberCoordenador +
-                                inputs.dreConfig.cspSaberAccountSr +
-                                inputs.dreConfig.cspSaberAccountPl +
-                                inputs.dreConfig.cspSaberAccountJr +
-                                inputs.dreConfig.cspSaberGestorTrafegoPl +
-                                inputs.dreConfig.cspSaberCopywriter +
-                                inputs.dreConfig.cspSaberDesignerSr +
-                                inputs.dreConfig.cspSaberTech +
-                                inputs.dreConfig.cspSaberSalesEnablement;
+                  const total = getMonthlyValue(inputs.dreConfig.cspSaberCoordenador, i) +
+                                getMonthlyValue(inputs.dreConfig.cspSaberAccountSr, i) +
+                                getMonthlyValue(inputs.dreConfig.cspSaberAccountPl, i) +
+                                getMonthlyValue(inputs.dreConfig.cspSaberAccountJr, i) +
+                                getMonthlyValue(inputs.dreConfig.cspSaberGestorTrafegoPl, i) +
+                                getMonthlyValue(inputs.dreConfig.cspSaberCopywriter, i) +
+                                getMonthlyValue(inputs.dreConfig.cspSaberDesignerSr, i) +
+                                getMonthlyValue(inputs.dreConfig.cspSaberTech, i) +
+                                getMonthlyValue(inputs.dreConfig.cspSaberSalesEnablement, i);
                   return (
                     <SpreadsheetCell
                       key={i}
@@ -3368,7 +4027,67 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     />
                   );
                 })}
-                <div className="spreadsheet-cell bg-primary/10" />
+                <SpreadsheetCell 
+                  value={getMonthlyValue(inputs.dreConfig.cspSaberCoordenador, 11) +
+                        getMonthlyValue(inputs.dreConfig.cspSaberAccountSr, 11) +
+                        getMonthlyValue(inputs.dreConfig.cspSaberAccountPl, 11) +
+                        getMonthlyValue(inputs.dreConfig.cspSaberAccountJr, 11) +
+                        getMonthlyValue(inputs.dreConfig.cspSaberGestorTrafegoPl, 11) +
+                        getMonthlyValue(inputs.dreConfig.cspSaberCopywriter, 11) +
+                        getMonthlyValue(inputs.dreConfig.cspSaberDesignerSr, 11) +
+                        getMonthlyValue(inputs.dreConfig.cspSaberTech, 11) +
+                        getMonthlyValue(inputs.dreConfig.cspSaberSalesEnablement, 11)} 
+                  format="currency" 
+                  className="bg-primary/10 font-semibold" 
+                />
+              </div>
+
+              {/* OUTROS CSP */}
+              <div className="flex row-hover bg-primary/5 mt-2">
+                <RowHeader label="Outros CSP" className="pl-4 font-semibold" />
+                {[...Array(13)].map((_, i) => (
+                  <div key={i} className="spreadsheet-cell" />
+                ))}
+              </div>
+
+              <div className="flex row-hover">
+                <RowHeader label="CSS Web Products" className="pl-8" tooltip="Custo fixo de 23k/mês" />
+                {[...Array(12)].map((_, i) => (
+                  <SpreadsheetCell
+                    key={i}
+                    value={getMonthlyValue(inputs.dreConfig.cspCssWebProducts, i)}
+                    format="currency"
+                    editable
+                    onChange={(val) => {
+                      const newValue = Array.isArray(inputs.dreConfig.cspCssWebProducts)
+                        ? [...inputs.dreConfig.cspCssWebProducts]
+                        : Array(12).fill(inputs.dreConfig.cspCssWebProducts);
+                      newValue[i] = val;
+                      onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspCssWebProducts: newValue } });
+                    }}
+                  />
+                ))}
+                <SpreadsheetCell value={getMonthlyValue(inputs.dreConfig.cspCssWebProducts, 11)} format="currency" className="bg-primary/10 font-semibold" />
+              </div>
+
+              <div className="flex row-hover">
+                <RowHeader label="Gerentes" className="pl-8" tooltip="Rampa trimestral de 60k a 90k" />
+                {[...Array(12)].map((_, i) => (
+                  <SpreadsheetCell
+                    key={i}
+                    value={getMonthlyValue(inputs.dreConfig.cspGerentes, i)}
+                    format="currency"
+                    editable
+                    onChange={(val) => {
+                      const newValue = Array.isArray(inputs.dreConfig.cspGerentes)
+                        ? [...inputs.dreConfig.cspGerentes]
+                        : Array(12).fill(inputs.dreConfig.cspGerentes);
+                      newValue[i] = val;
+                      onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, cspGerentes: newValue } });
+                    }}
+                  />
+                ))}
+                <SpreadsheetCell value={getMonthlyValue(inputs.dreConfig.cspGerentes, 11)} format="currency" className="bg-primary/10 font-semibold" />
               </div>
 
               {/* ========== RECEITA ========== */}
@@ -3716,94 +4435,226 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
               <div className="flex row-hover mt-4">
                 <RowHeader label="(-) Despesas Marketing e Vendas" className="pl-6 font-semibold" />
                 {monthlyData.map((m, i) => (
-                  <SpreadsheetCell key={i} value={m.dre.totalMarketingVendas} format="currency" className="font-bold text-destructive" />
+                  <SpreadsheetCell 
+                    key={i} 
+                    value={inputs.topline.investmentMonthly[i] + m.dre.salesMetrics.totalDespesasMarketingVendas} 
+                    format="currency" 
+                    className="font-bold text-destructive" 
+                  />
                 ))}
                 <SpreadsheetCell
-                  value={monthlyData.reduce((sum, m) => sum + m.dre.totalMarketingVendas, 0)}
+                  value={inputs.topline.investmentMonthly.reduce((sum, v) => sum + v, 0) + monthlyData.reduce((sum, m) => sum + m.dre.salesMetrics.totalDespesasMarketingVendas, 0)}
                   format="currency"
                   className="bg-primary/10 font-semibold text-destructive"
                 />
               </div>
 
               <div className="flex row-hover">
-                <RowHeader label="(-) Investimento Marketing" className="pl-10" tooltip="Investimento em aquisição de leads" />
+                <RowHeader label="(-) Investimento Marketing" className="pl-10" tooltip="Investimento em aquisição de leads (do BP)" />
                 {monthlyData.map((m, i) => (
-                  <SpreadsheetCell key={i} value={m.dre.investimentoMarketing} format="currency" />
+                  <SpreadsheetCell key={i} value={inputs.topline.investmentMonthly[i]} format="currency" />
                 ))}
                 <SpreadsheetCell
-                  value={monthlyData.reduce((sum, m) => sum + m.dre.investimentoMarketing, 0)}
+                  value={inputs.topline.investmentMonthly.reduce((sum, v) => sum + v, 0)}
+                  format="currency"
+                  className="bg-primary/10"
+                />
+              </div>
+
+              {/* Despesas Comerciais - Breakdown Detalhado */}
+              <div className="flex row-hover">
+                <RowHeader label="(-) Despesas Comerciais" className="pl-10" />
+                {monthlyData.map((m, i) => (
+                  <SpreadsheetCell key={i} value={m.dre.salesMetrics.totalDespesasMarketingVendas} format="currency" />
+                ))}
+                <SpreadsheetCell
+                  value={monthlyData.reduce((sum, m) => sum + m.dre.salesMetrics.totalDespesasMarketingVendas, 0)}
+                  format="currency"
+                  className="bg-primary/10"
+                />
+              </div>
+
+              {/* Activation Breakdown */}
+              <div className="flex row-hover">
+                <RowHeader label="Activation" className="pl-12 font-semibold" />
+                {monthlyData.map((m, i) => (
+                  <SpreadsheetCell key={i} value={m.dre.salesMetrics.despesaComercialActivation} format="currency" />
+                ))}
+                <SpreadsheetCell
+                  value={monthlyData.reduce((sum, m) => sum + m.dre.salesMetrics.despesaComercialActivation, 0)}
                   format="currency"
                   className="bg-primary/10"
                 />
               </div>
 
               <div className="flex row-hover">
-                <RowHeader label="(-) Folha Gestão Comercial" className="pl-10" tooltip={formatCurrency(inputs.dreConfig.folhaGestaoComercial)} />
+                <RowHeader label="Closers" className="pl-14" tooltip="Remuneração closers = Quantidade × Salário" />
                 {monthlyData.map((m, i) => (
-                  <SpreadsheetCell key={i} value={m.dre.folhaGestaoComercial} format="currency" />
+                  <SpreadsheetCell 
+                    key={i} 
+                    value={m.dre.salesMetrics.remuneracaoCloser} 
+                    format="currency"
+                    tooltip={`${m.dre.salesMetrics.closersRequired} closers × R$ ${inputs.salesConfig.closerSalary.toLocaleString('pt-BR')}`}
+                  />
                 ))}
                 <SpreadsheetCell
-                  value={monthlyData.reduce((sum, m) => sum + m.dre.folhaGestaoComercial, 0)}
+                  value={monthlyData.reduce((sum, m) => sum + m.dre.salesMetrics.remuneracaoCloser, 0)}
                   format="currency"
                   className="bg-primary/10"
                 />
               </div>
 
               <div className="flex row-hover">
-                <RowHeader label="(-) Despesa Comercial Activation" className="pl-10" />
+                <RowHeader label="SDRs" className="pl-14" tooltip="Remuneração SDRs = Quantidade × Salário" />
                 {monthlyData.map((m, i) => (
-                  <SpreadsheetCell key={i} value={m.dre.despesaComercialActivation} format="currency" />
+                  <SpreadsheetCell 
+                    key={i} 
+                    value={m.dre.salesMetrics.remuneracaoSDR} 
+                    format="currency"
+                    tooltip={`${m.dre.salesMetrics.sdrsRequired} SDRs × R$ ${inputs.salesConfig.sdrSalary.toLocaleString('pt-BR')}`}
+                  />
                 ))}
                 <SpreadsheetCell
-                  value={monthlyData.reduce((sum, m) => sum + m.dre.despesaComercialActivation, 0)}
+                  value={monthlyData.reduce((sum, m) => sum + m.dre.salesMetrics.remuneracaoSDR, 0)}
                   format="currency"
                   className="bg-primary/10"
                 />
               </div>
 
               <div className="flex row-hover">
-                <RowHeader label="Comissão & Bônus" className="pl-12" />
+                <RowHeader label="Comissão Ativação" className="pl-14" tooltip={`${(inputs.salesConfig.comissaoActivationRate * 100).toFixed(1)}% sobre receita de ativação`} />
                 {monthlyData.map((m, i) => (
-                  <SpreadsheetCell key={i} value={m.dre.comissoes} format="currency" />
+                  <SpreadsheetCell key={i} value={m.dre.salesMetrics.comissaoVendasActivation} format="currency" />
                 ))}
                 <SpreadsheetCell
-                  value={monthlyData.reduce((sum, m) => sum + m.dre.comissoes, 0)}
+                  value={monthlyData.reduce((sum, m) => sum + m.dre.salesMetrics.comissaoVendasActivation, 0)}
                   format="currency"
                   className="bg-primary/10"
                 />
               </div>
 
               <div className="flex row-hover">
-                <RowHeader label="Remuneração Closer" className="pl-12" />
+                <RowHeader label="Bônus Campanhas" className="pl-14" />
                 {monthlyData.map((m, i) => (
-                  <SpreadsheetCell key={i} value={m.dre.remuneracaoCloser} format="currency" />
+                  <SpreadsheetCell key={i} value={m.dre.salesMetrics.bonusCampanhasActivation} format="currency" />
                 ))}
                 <SpreadsheetCell
-                  value={monthlyData.reduce((sum, m) => sum + m.dre.remuneracaoCloser, 0)}
+                  value={monthlyData.reduce((sum, m) => sum + m.dre.salesMetrics.bonusCampanhasActivation, 0)}
                   format="currency"
                   className="bg-primary/10"
                 />
               </div>
 
               <div className="flex row-hover">
-                <RowHeader label="Remuneração SDR" className="pl-12" />
+                <RowHeader label="Despesas Visitas" className="pl-14" />
                 {monthlyData.map((m, i) => (
-                  <SpreadsheetCell key={i} value={m.dre.remuneracaoSDR} format="currency" />
+                  <SpreadsheetCell key={i} value={m.dre.salesMetrics.despesasVisitasActivation} format="currency" />
                 ))}
                 <SpreadsheetCell
-                  value={monthlyData.reduce((sum, m) => sum + m.dre.remuneracaoSDR, 0)}
+                  value={monthlyData.reduce((sum, m) => sum + m.dre.salesMetrics.despesasVisitasActivation, 0)}
                   format="currency"
                   className="bg-primary/10"
                 />
               </div>
 
               <div className="flex row-hover">
-                <RowHeader label="Despesas com Visitas" className="pl-12" />
+                <RowHeader label="Estrutura Suporte" className="pl-14" tooltip="Despesas com estrutura de suporte (variável por mês)" />
                 {monthlyData.map((m, i) => (
-                  <SpreadsheetCell key={i} value={m.dre.despesasVisitas} format="currency" />
+                  <SpreadsheetCell key={i} value={m.dre.salesMetrics.estruturaSuporte} format="currency" />
                 ))}
                 <SpreadsheetCell
-                  value={monthlyData.reduce((sum, m) => sum + m.dre.despesasVisitas, 0)}
+                  value={monthlyData.reduce((sum, m) => sum + m.dre.salesMetrics.estruturaSuporte, 0)}
+                  format="currency"
+                  className="bg-primary/10"
+                />
+              </div>
+
+              {/* Expansion Breakdown */}
+              <div className="flex row-hover">
+                <RowHeader label="Expansion" className="pl-12 font-semibold" />
+                {monthlyData.map((m, i) => (
+                  <SpreadsheetCell key={i} value={m.dre.salesMetrics.despesaComercialExpansion} format="currency" />
+                ))}
+                <SpreadsheetCell
+                  value={monthlyData.reduce((sum, m) => sum + m.dre.salesMetrics.despesaComercialExpansion, 0)}
+                  format="currency"
+                  className="bg-primary/10"
+                />
+              </div>
+
+              <div className="flex row-hover">
+                <RowHeader label="Farmers (CS)" className="pl-14" tooltip="Remuneração farmers = Quantidade × Salário" />
+                {monthlyData.map((m, i) => (
+                  <SpreadsheetCell 
+                    key={i} 
+                    value={m.dre.salesMetrics.remuneracaoFarmer} 
+                    format="currency"
+                    tooltip={`${m.dre.salesMetrics.farmersRequired} farmers × R$ ${inputs.salesConfig.farmerSalary.toLocaleString('pt-BR')}`}
+                  />
+                ))}
+                <SpreadsheetCell
+                  value={monthlyData.reduce((sum, m) => sum + m.dre.salesMetrics.remuneracaoFarmer, 0)}
+                  format="currency"
+                  className="bg-primary/10"
+                />
+              </div>
+
+              <div className="flex row-hover">
+                <RowHeader label="Comissão Farmer" className="pl-14" tooltip={`${(inputs.salesConfig.comissaoExpansionRate * 100).toFixed(1)}% sobre receita de expansão`} />
+                {monthlyData.map((m, i) => (
+                  <SpreadsheetCell key={i} value={m.dre.salesMetrics.comissaoFarmerExpansion} format="currency" />
+                ))}
+                <SpreadsheetCell
+                  value={monthlyData.reduce((sum, m) => sum + m.dre.salesMetrics.comissaoFarmerExpansion, 0)}
+                  format="currency"
+                  className="bg-primary/10"
+                />
+              </div>
+
+              <div className="flex row-hover">
+                <RowHeader label="Bônus Campanhas" className="pl-14" />
+                {monthlyData.map((m, i) => (
+                  <SpreadsheetCell key={i} value={m.dre.salesMetrics.bonusCampanhasExpansion} format="currency" />
+                ))}
+                <SpreadsheetCell
+                  value={monthlyData.reduce((sum, m) => sum + m.dre.salesMetrics.bonusCampanhasExpansion, 0)}
+                  format="currency"
+                  className="bg-primary/10"
+                />
+              </div>
+
+              <div className="flex row-hover">
+                <RowHeader label="Comissão Operação" className="pl-14" />
+                {monthlyData.map((m, i) => (
+                  <SpreadsheetCell key={i} value={m.dre.salesMetrics.comissaoOperacao} format="currency" />
+                ))}
+                <SpreadsheetCell
+                  value={monthlyData.reduce((sum, m) => sum + m.dre.salesMetrics.comissaoOperacao, 0)}
+                  format="currency"
+                  className="bg-primary/10"
+                />
+              </div>
+
+              <div className="flex row-hover">
+                <RowHeader label="Despesas Visitas" className="pl-14" />
+                {monthlyData.map((m, i) => (
+                  <SpreadsheetCell key={i} value={m.dre.salesMetrics.despesasVisitasExpansion} format="currency" />
+                ))}
+                <SpreadsheetCell
+                  value={monthlyData.reduce((sum, m) => sum + m.dre.salesMetrics.despesasVisitasExpansion, 0)}
+                  format="currency"
+                  className="bg-primary/10"
+                />
+              </div>
+
+              {/* Estruturas Fixas */}
+              <div className="flex row-hover">
+                <RowHeader label="Folha Gestão Comercial" className="pl-12" />
+                {monthlyData.map((m, i) => (
+                  <SpreadsheetCell key={i} value={m.dre.salesMetrics.folhaGestaoComercial} format="currency" />
+                ))}
+                <SpreadsheetCell
+                  value={monthlyData.reduce((sum, m) => sum + m.dre.salesMetrics.folhaGestaoComercial, 0)}
                   format="currency"
                   className="bg-primary/10"
                 />
