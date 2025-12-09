@@ -174,6 +174,8 @@ const remuneracaoCloser = closersRequired × inputs.salesConfig.closerSalary
 - `closerProductivity`: 10 WONs/mês/closer (default)
 - `closerSalary`: R$ 13.500/mês/closer (default)
 
+**Observação importante:** cada `closer` precisa ser onboardado 1 mês antes do mês em que será necessário. Ou seja, a contratação deve ocorrer com 1 mês de antecedência para garantir disponibilidade no mês alvo.
+
 ---
 
 ### 6. **REMUNERAÇÃO SDR** - Dinâmico baseado em quantidade
@@ -207,6 +209,8 @@ const remuneracaoSDR = sdrsRequired × inputs.salesConfig.sdrSalary
 ✅ **Proposta:**
 - `sdrProductivity`: 80 SQLs/mês/SDR (default)
 - `sdrSalary`: R$ 3.250/mês/SDR (default)
+
+**Observação importante:** cada `SDR` precisa ser onboardado 1 mês antes do mês em que será necessário. Portanto, planejar a contratação 1 mês antes do mês de demanda.
 
 ---
 

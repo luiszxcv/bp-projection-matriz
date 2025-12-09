@@ -76,6 +76,7 @@ const createEmptyDREData = (month: number): DREData => ({
   inadimplencia: 0,
   churnM0Falcons: 0,
   churnRecebimentoOPS: 0,
+  devolucoesSaber: 0,
   performanceConversao: 0,
   receitaBrutaRecebida: 0,
   royalties: 0,
@@ -98,6 +99,7 @@ const createEmptyDREData = (month: number): DREData => ({
   percentualMargemOperacional: 0,
   salesMetrics: {} as SalesMetrics, // Será calculado depois
   totalMarketingVendas: 0,
+  investimentoMarketingAmortizado: 0,
   margemContribuicao: 0,
   percentualMargemContribuicao: 0,
   despesasTimeAdm: 0,
@@ -137,6 +139,20 @@ const createEmptyDREData = (month: number): DREData => ({
   roi: 0,
   quantidadeClientes: 0,
 });
+
+// Retorna o valor amortizado do investimento de marketing para um mês específico
+export function getAmortizedInvestment(investments: number[], monthIndex: number, duration = 6): number {
+  if (!investments || investments.length === 0) return 0;
+  let sum = 0;
+  for (let j = 0; j < investments.length; j++) {
+    const start = j;
+    const end = j + duration - 1; // inclusive
+    if (monthIndex >= start && monthIndex <= end) {
+      sum += investments[j] / duration;
+    }
+  }
+  return sum;
+}
 
 export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
   const months: MonthlyData[] = [];
@@ -188,6 +204,9 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
   // Sales running headcount (contratações persistem entre meses)
   let runningSDR = inputs.dreConfig.currentSDR ?? 1;
   let runningClosers = inputs.dreConfig.currentClosers ?? 2;
+  // Hires scheduled this month that will onboard next month
+  let pendingHiresSDR = 0;
+  let pendingHiresClosers = 0;
   
 
   for (let month = 1; month <= 12; month++) {
@@ -651,18 +670,27 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
     }
     monthData.capacityPlan.totalHoursExecutar = totalHoursExecutar;
     
-    // Calcular squads necessárias baseado em horas disponíveis por squad
+    // Calcular headcount necessário a partir de horas necessárias e horas efetivas por pessoa
+    // Usa-se um fator de disponibilidade para converter horas produtivas em capacidade efetiva
     const hoursPerSquadSaber = capacityConfig.saberSquad.headcount * capacityConfig.saberSquad.productiveHoursPerPerson;
     const hoursPerSquadExecutar = capacityConfig.executarSquad.headcount * capacityConfig.executarSquad.productiveHoursPerPerson;
-    
-    monthData.capacityPlan.squadsSaber = hoursPerSquadSaber > 0 ? Math.ceil(totalHoursSaber / hoursPerSquadSaber) : 0;
-    monthData.capacityPlan.squadsExecutar = hoursPerSquadExecutar > 0 ? Math.ceil(totalHoursExecutar / hoursPerSquadExecutar) : 0;
-    monthData.capacityPlan.totalSquads = monthData.capacityPlan.squadsSaber + monthData.capacityPlan.squadsExecutar;
-    
-    // Calcular headcount necessário
-    monthData.capacityPlan.hcSaber = monthData.capacityPlan.squadsSaber * capacityConfig.saberSquad.headcount;
-    monthData.capacityPlan.hcExecutar = monthData.capacityPlan.squadsExecutar * capacityConfig.executarSquad.headcount;
+
+    const availability = capacityConfig.availabilityFactor ?? 0.85;
+    const effectiveHoursPerPersonSaber = capacityConfig.saberSquad.productiveHoursPerPerson * availability;
+    const effectiveHoursPerPersonExecutar = capacityConfig.executarSquad.productiveHoursPerPerson * availability;
+
+    const peopleGrossSaber = effectiveHoursPerPersonSaber > 0 ? Math.ceil(totalHoursSaber / effectiveHoursPerPersonSaber) : 0;
+    const peopleGrossExecutar = effectiveHoursPerPersonExecutar > 0 ? Math.ceil(totalHoursExecutar / effectiveHoursPerPersonExecutar) : 0;
+
+    // Headcount requerido (bruto) por área
+    monthData.capacityPlan.hcSaber = peopleGrossSaber;
+    monthData.capacityPlan.hcExecutar = peopleGrossExecutar;
     monthData.capacityPlan.totalHC = monthData.capacityPlan.hcSaber + monthData.capacityPlan.hcExecutar;
+
+    // Para manter compatibilidade com métricas existentes, derivamos squads a partir do HC requerido
+    monthData.capacityPlan.squadsSaber = capacityConfig.saberSquad.headcount > 0 ? Math.ceil(monthData.capacityPlan.hcSaber / capacityConfig.saberSquad.headcount) : 0;
+    monthData.capacityPlan.squadsExecutar = capacityConfig.executarSquad.headcount > 0 ? Math.ceil(monthData.capacityPlan.hcExecutar / capacityConfig.executarSquad.headcount) : 0;
+    monthData.capacityPlan.totalSquads = monthData.capacityPlan.squadsSaber + monthData.capacityPlan.squadsExecutar;
     
     // Calcular Turnover e Contratações (7% ao mês)
     const turnoverRate = 0.07;
@@ -706,96 +734,36 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
     const totalMQLs = Object.values(monthData.mqls).reduce((s, v) => s + v, 0);
     const totalSALs = Object.values(monthData.sals).reduce((s, v) => s + v, 0);
 
+    // Primeiro, aplicar contratações agendadas no mês anterior (essas onboardam agora)
+    if (pendingHiresSDR > 0) {
+      runningSDR += pendingHiresSDR;
+    }
+    if (pendingHiresClosers > 0) {
+      runningClosers += pendingHiresClosers;
+    }
+
     const requiredSDR = Math.ceil(totalMQLs / 200);
     const requiredClosers = Math.ceil(totalSALs / 50);
 
-    // Calcular diferenças considerando contratações anteriores (persistem)
-    const hiresThisMonthSDR = Math.max(0, requiredSDR - runningSDR);
-    const hiresThisMonthClosers = Math.max(0, requiredClosers - runningClosers);
+    // Contratações necessárias PARA ATENDER o mês seguinte.
+    // Política: contratar 1 mês antes do onboarding — ou seja, quando detectamos falta
+    // no mês corrente, agendamos a contratação que só entra na base no próximo mês.
+    const hiresToScheduleSDR = Math.max(0, requiredSDR - runningSDR);
+    const hiresToScheduleClosers = Math.max(0, requiredClosers - runningClosers);
 
-    // Atualizar running headcount para próximos meses
-    runningSDR += hiresThisMonthSDR;
-    runningClosers += hiresThisMonthClosers;
+    // Agendar contratações que irão onboardar no próximo mês
+    pendingHiresSDR = hiresToScheduleSDR;
+    pendingHiresClosers = hiresToScheduleClosers;
 
     monthData.capacityPlan.salesSDRRequired = requiredSDR;
     monthData.capacityPlan.salesClosersRequired = requiredClosers;
-    // salesCurrent* representa o HC disponível APÓS eventuais contratações deste mês
+    // salesCurrent* representa o HC disponível NESTE MÊS (antes das contratações agendadas)
     monthData.capacityPlan.salesCurrentSDR = runningSDR;
     monthData.capacityPlan.salesCurrentClosers = runningClosers;
-    monthData.capacityPlan.salesHires = hiresThisMonthSDR + hiresThisMonthClosers; // novas contratações no mês
+    // salesHires representa as contratações que devem ocorrer/agendar este mês (embarcam no próximo)
+    monthData.capacityPlan.salesHires = hiresToScheduleSDR + hiresToScheduleClosers;
     
-    // === SALES METRICS CALCULATION ===
-    // Inicializar estrutura salesMetrics
-    monthData.dre.salesMetrics = {
-      closersRequired: 0,
-      sdrsRequired: 0,
-      farmersRequired: 0,
-      remuneracaoCloser: 0,
-      remuneracaoSDR: 0,
-      remuneracaoFarmer: 0,
-      comissaoVendasActivation: 0,
-      comissaoFarmerExpansion: 0,
-      folhaGestaoComercial: 0,
-      bonusCampanhasActivation: 0,
-      estruturaSuporte: 0,
-      despesasVisitasActivation: 0,
-      bonusCampanhasExpansion: 0,
-      comissaoOperacao: 0,
-      despesasVisitasExpansion: 0,
-      despesaComercialActivation: 0,
-      despesaComercialExpansion: 0,
-      totalDespesasMarketingVendas: 0,
-    };
-    
-    // 1. Calcular quantidades necessárias
-    const totalWons = TIERS.reduce((sum, tier) => sum + monthData.wons[tier], 0);
-    const totalSQLs = TIERS.reduce((sum, tier) => sum + monthData.sqls[tier], 0);
-    const clientesAtivos = monthData.capacityPlan.totalClientsSaber + monthData.capacityPlan.totalClientsExecutar;
-
-    monthData.dre.salesMetrics.closersRequired = Math.ceil(totalWons / inputs.salesConfig.closerProductivity);
-    monthData.dre.salesMetrics.sdrsRequired = Math.ceil(totalSQLs / inputs.salesConfig.sdrProductivity);
-    monthData.dre.salesMetrics.farmersRequired = Math.ceil(clientesAtivos / inputs.salesConfig.farmerProductivity);
-
-    // 2. Calcular remunerações
-    monthData.dre.salesMetrics.remuneracaoCloser = monthData.dre.salesMetrics.closersRequired * inputs.salesConfig.closerSalary;
-    monthData.dre.salesMetrics.remuneracaoSDR = monthData.dre.salesMetrics.sdrsRequired * inputs.salesConfig.sdrSalary;
-    monthData.dre.salesMetrics.remuneracaoFarmer = monthData.dre.salesMetrics.farmersRequired * inputs.salesConfig.farmerSalary;
-
-    // 3. Calcular comissões
-    monthData.dre.salesMetrics.comissaoVendasActivation = monthData.totalNewRevenue * inputs.salesConfig.comissaoActivationRate;
-    const receitaExpansionTotal = monthData.totalExpansionRevenue + monthData.totalLegacyExpansionRevenue;
-    monthData.dre.salesMetrics.comissaoFarmerExpansion = receitaExpansionTotal * inputs.salesConfig.comissaoExpansionRate;
-
-    // 4. Despesas fixas
-    monthData.dre.salesMetrics.folhaGestaoComercial = inputs.salesConfig.folhaGestaoComercial;
-    monthData.dre.salesMetrics.bonusCampanhasActivation = inputs.salesConfig.bonusCampanhasActivation;
-    monthData.dre.salesMetrics.estruturaSuporte = inputs.salesConfig.estruturaSuporte[idx];
-    monthData.dre.salesMetrics.despesasVisitasActivation = inputs.salesConfig.despesasVisitasActivation;
-    monthData.dre.salesMetrics.bonusCampanhasExpansion = inputs.salesConfig.bonusCampanhasExpansion;
-    monthData.dre.salesMetrics.comissaoOperacao = inputs.salesConfig.comissaoOperacao;
-    monthData.dre.salesMetrics.despesasVisitasExpansion = inputs.salesConfig.despesasVisitasExpansion;
-
-    // 5. Totais
-    monthData.dre.salesMetrics.despesaComercialActivation = 
-      monthData.dre.salesMetrics.bonusCampanhasActivation +
-      monthData.dre.salesMetrics.comissaoVendasActivation +
-      monthData.dre.salesMetrics.estruturaSuporte +
-      monthData.dre.salesMetrics.remuneracaoCloser +
-      monthData.dre.salesMetrics.remuneracaoSDR +
-      monthData.dre.salesMetrics.despesasVisitasActivation;
-
-    monthData.dre.salesMetrics.despesaComercialExpansion = 
-      monthData.dre.salesMetrics.remuneracaoFarmer +
-      monthData.dre.salesMetrics.comissaoFarmerExpansion +
-      monthData.dre.salesMetrics.comissaoOperacao +
-      monthData.dre.salesMetrics.bonusCampanhasExpansion +
-      monthData.dre.salesMetrics.despesasVisitasExpansion;
-
-    // Total Despesas Marketing e Vendas = Activation + Expansion + Folha Gestão Comercial
-    monthData.dre.salesMetrics.totalDespesasMarketingVendas = 
-      monthData.dre.salesMetrics.despesaComercialActivation +
-      monthData.dre.salesMetrics.despesaComercialExpansion +
-      monthData.dre.salesMetrics.folhaGestaoComercial;
+    // SALES METRICS: moved to DRE calculation to ensure metrics use DRE revenue view (DFC vs competência)
     
     // Calcular métricas
     if (monthData.capacityPlan.totalHC > 0) {
@@ -942,21 +910,26 @@ function calculateDRE(
   }
   
   // ========== DEDUCÕES ==========
-  // Linhas gerenciais só são aplicadas se usarLinhasGerenciais = true
+  // Devoluções Saber: sempre aplicadas (percentual sobre receita de aquisição do produto Saber)
+  const totalSaberAcquisitionRevenue = TIERS.reduce((sum, tier) => sum + monthData.revenueByTierProduct[tier].saber, 0);
+  dre.devolucoesSaber = totalSaberAcquisitionRevenue * (config.devolucoesSaberRate ?? 0);
+
+  // Linhas gerenciais (inadimplência e churns) só são aplicadas se usarLinhasGerenciais = true
   if (config.usarLinhasGerenciais) {
     dre.inadimplencia = dre.revenue * config.inadimplenciaRate;
     dre.churnM0Falcons = dre.revenue * config.churnM0FalconsRate;
     dre.churnRecebimentoOPS = dre.revenue * config.churnRecebimentoOPSRate;
-    dre.performanceConversao = 1 - (config.inadimplenciaRate + config.churnM0FalconsRate + config.churnRecebimentoOPSRate);
-    dre.receitaBrutaRecebida = dre.revenue - dre.inadimplencia - dre.churnM0Falcons - dre.churnRecebimentoOPS;
   } else {
-    // Quando desabilitado, não aplica deduções gerenciais
     dre.inadimplencia = 0;
     dre.churnM0Falcons = 0;
     dre.churnRecebimentoOPS = 0;
-    dre.performanceConversao = 1;
-    dre.receitaBrutaRecebida = dre.revenue;
   }
+
+  // Receita bruta recebida considera devoluções sempre, e também inadimplência/churns quando ativadas
+  dre.receitaBrutaRecebida = dre.revenue - dre.inadimplencia - dre.churnM0Falcons - dre.churnRecebimentoOPS - dre.devolucoesSaber;
+
+  // Performance conversão: proporção efetivamente recebida sobre a receita (inclui devoluções e deduções aplicadas)
+  dre.performanceConversao = dre.revenue > 0 ? dre.receitaBrutaRecebida / dre.revenue : 1;
   
   // ========== TRIBUTOS ==========
   dre.royalties = dre.receitaBrutaRecebida * config.royaltiesRate;
@@ -1026,10 +999,75 @@ function calculateDRE(
   dre.percentualMargemOperacional = dre.receitaLiquida > 0 ? dre.margemOperacional / dre.receitaLiquida : 0;
   
   // ========== DESPESAS MARKETING E VENDAS ==========
-  // Use salesMetrics calculados anteriormente
-  dre.salesMetrics = monthData.dre.salesMetrics;
+  // === SALES METRICS (calcular aqui para usar a mesma base de receita do DRE) ===
+  const salesMetrics = {
+    closersRequired: Math.ceil(totalWons / inputs.salesConfig.closerProductivity),
+    sdrsRequired: Math.ceil(totalSQLs / inputs.salesConfig.sdrProductivity),
+    farmersRequired: Math.ceil(clientesAtivos / inputs.salesConfig.farmerProductivity),
+    remuneracaoCloser: 0,
+    remuneracaoSDR: 0,
+    remuneracaoFarmer: 0,
+    comissaoVendasActivation: 0,
+    comissaoFarmerExpansion: 0,
+    folhaGestaoComercial: inputs.salesConfig.folhaGestaoComercial,
+    bonusCampanhasActivation: inputs.salesConfig.bonusCampanhasActivation,
+    estruturaSuporte: inputs.salesConfig.estruturaSuporte[idx],
+    despesasVisitasActivation: inputs.salesConfig.despesasVisitasActivation,
+    bonusCampanhasExpansion: inputs.salesConfig.bonusCampanhasExpansion,
+    comissaoOperacao: 0,
+    despesasVisitasExpansion: inputs.salesConfig.despesasVisitasExpansion,
+    despesaComercialActivation: 0,
+    despesaComercialExpansion: 0,
+    totalDespesasMarketingVendas: 0,
+  } as any;
+
+  // Remunerações
+  salesMetrics.remuneracaoCloser = salesMetrics.closersRequired * inputs.salesConfig.closerSalary;
+  salesMetrics.remuneracaoSDR = salesMetrics.sdrsRequired * inputs.salesConfig.sdrSalary;
+  salesMetrics.remuneracaoFarmer = salesMetrics.farmersRequired * inputs.salesConfig.farmerSalary;
+
+  // Comissões: usar base de DRE para activation (pode ser DFC quando gerencial)
+  salesMetrics.comissaoVendasActivation = dre.activationRevenue * inputs.salesConfig.comissaoActivationRate;
+  const receitaExpansionTotal = monthData.totalExpansionRevenue + monthData.totalLegacyExpansionRevenue;
+  salesMetrics.comissaoFarmerExpansion = receitaExpansionTotal * inputs.salesConfig.comissaoExpansionRate;
+
+  // Comissão Operação (Monetização Ops) — percentual sobre expansão (legacy+expansion)
+  salesMetrics.comissaoOperacao = receitaExpansionTotal * (inputs.salesConfig.comissaoMonetizacaoOpsRate ?? inputs.salesConfig.comissaoExpansionRate);
+
+  // Totais
+  salesMetrics.despesaComercialActivation =
+    salesMetrics.bonusCampanhasActivation +
+    salesMetrics.comissaoVendasActivation +
+    salesMetrics.estruturaSuporte +
+    salesMetrics.remuneracaoCloser +
+    salesMetrics.remuneracaoSDR +
+    salesMetrics.despesasVisitasActivation;
+
+  salesMetrics.despesaComercialExpansion =
+    salesMetrics.remuneracaoFarmer +
+    salesMetrics.comissaoFarmerExpansion +
+    salesMetrics.comissaoOperacao +
+    salesMetrics.bonusCampanhasExpansion +
+    salesMetrics.despesasVisitasExpansion;
+
+  salesMetrics.totalDespesasMarketingVendas =
+    salesMetrics.despesaComercialActivation +
+    salesMetrics.despesaComercialExpansion +
+    salesMetrics.folhaGestaoComercial;
+
+  dre.salesMetrics = salesMetrics as any;
+  // também armazenar em monthData para compatibilidade com UI/export
+  monthData.dre.salesMetrics = salesMetrics as any;
   // Total = somente despesas comerciais (Activation + Expansion + Folha Gestão)
-  dre.totalMarketingVendas = monthData.dre.salesMetrics.totalDespesasMarketingVendas;
+  // Sempre incluir investimento no total de Marketing e Vendas.
+  // - Se usarLinhasGerenciais: incluir a parcela amortizada (6 meses)
+  // - Se não usar: incluir o investimento mensal integral
+  const amortized = getAmortizedInvestment(inputs.topline.investmentMonthly, idx, 6);
+  dre.investimentoMarketingAmortizado = amortized;
+  const investimentoAplicado = config.usarLinhasGerenciais ? amortized : (inputs.topline.investmentMonthly[idx] || 0);
+  // guardar para exibição/debug
+  (dre as any).investimentoMarketingAplicado = investimentoAplicado;
+  dre.totalMarketingVendas = monthData.dre.salesMetrics.totalDespesasMarketingVendas + investimentoAplicado;
   
   // ========== MARGEM DE CONTRIBUIÇÃO ==========
   dre.margemContribuicao = dre.margemOperacional - dre.totalMarketingVendas;

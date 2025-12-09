@@ -132,6 +132,8 @@ export interface CapacityPlanConfig {
     productiveHoursPerPerson: number;     // Horas produtivas por pessoa por mês
     roleHours: SquadRoleHours;            // Horas alocadas por cargo por tier
   };
+  // Fator (0..1) que representa disponibilidade/eficiência média (ex: 0.85)
+  availabilityFactor?: number;
 }
 
 export interface CapacityPlanData {
@@ -201,6 +203,8 @@ export interface DREConfig {
   inadimplenciaRate: number;        // Default: 4%
   churnM0FalconsRate: number;       // Default: 3%
   churnRecebimentoOPSRate: number;  // Default: 2%
+  // Devoluções específicas para produto Saber (percentual aplicado sobre a receita Saber de aquisição)
+  devolucoesSaberRate: number;      // Default: 5%
   
   // Tributos sobre Receita Bruta Recebida
   royaltiesRate: number;            // Default: 15%
@@ -300,7 +304,8 @@ export interface SalesConfig {
   estruturaSuporte: number[];          // Array de 12 meses (Default: [3500, 3500, ...])
   despesasVisitasActivation: number;   // Default: R$ 5.000/mês
   bonusCampanhasExpansion: number;     // Default: R$ 1.500/mês
-  comissaoOperacao: number;            // Default: R$ 8.000/mês
+  // Comissão Monetização Ops: percentual aplicado sobre a receita de expansão total
+  comissaoMonetizacaoOpsRate: number;  // Default: 5% (0.05)
   despesasVisitasExpansion: number;    // Default: R$ 2.000/mês
 }
 
@@ -327,6 +332,7 @@ export interface DREData {
   inadimplencia: number;
   churnM0Falcons: number;
   churnRecebimentoOPS: number;
+  devolucoesSaber: number;
   performanceConversao: number;           // % (0-1)
   receitaBrutaRecebida: number;
   
@@ -357,6 +363,8 @@ export interface DREData {
   // DESPESAS MARKETING E VENDAS (calculado via SalesMetrics)
   salesMetrics: SalesMetrics;
   totalMarketingVendas: number;
+  // Quando usar linhas gerenciais, valor do investimento de marketing amortizado (6 meses)
+  investimentoMarketingAmortizado?: number;
   
   // MARGEM DE CONTRIBUIÇÃO
   margemContribuicao: number;

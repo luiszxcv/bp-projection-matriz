@@ -202,8 +202,10 @@ export const defaultInputs: SimulationInputs = {
     },
   },
   capacityPlan: {
-    initialHCSaber: 3,      // HC inicial Saber: 3 pessoas já existentes
-    initialHCExecutar: 160, // HC inicial Executar: 160 pessoas já existentes (15 squads)
+    initialHCSaber: 4,      // HC inicial Saber: 4 pessoas já existentes
+    initialHCExecutar: 169, // HC inicial Executar: 169 pessoas já existentes (aprox. realidade)
+    // Fator de disponibilidade usado para converter horas produtivas em capacidade efetiva
+    availabilityFactor: 0.95,
     saberSquad: {
       headcount: 9,
       productiveHoursPerPerson: 144, // Horas produtivas por pessoa por mês
@@ -333,7 +335,7 @@ export const defaultInputs: SimulationInputs = {
     sdrSalary: 3250,                      // R$ 3.250/mês
     
     // Remuneração Farmers
-    farmerProductivity: 100,              // 100 clientes/farmer
+    farmerProductivity: 150,              // 150 clientes/farmer
     farmerSalary: 7000,                   // R$ 7.000/mês
     
     // Despesas Fixas Mensais
@@ -342,7 +344,8 @@ export const defaultInputs: SimulationInputs = {
     estruturaSuporte: [3500, 3500, 8500, 8500, 8500, 8500, 8500, 8500, 8500, 8500, 8500, 8500], // Variável por mês
     despesasVisitasActivation: 5000,      // R$ 5.000/mês
     bonusCampanhasExpansion: 1500,        // R$ 1.500/mês
-    comissaoOperacao: 8000,               // R$ 8.000/mês
+    // Comissão Monetização Ops: percentual sobre expansão (inicial igual a comissaoExpansionRate)
+    comissaoMonetizacaoOpsRate: 0.05,
     despesasVisitasExpansion: 2000,       // R$ 2.000/mês
   },
   dreConfig: {
@@ -353,6 +356,8 @@ export const defaultInputs: SimulationInputs = {
     inadimplenciaRate: 0.04,              // 4%
     churnM0FalconsRate: 0.00,             // 0% (quebra aplicada no funil)
     churnRecebimentoOPSRate: 0.02,        // 2%
+    // Devoluções Saber: percentual aplicado sobre a receita de aquisição do produto Saber
+    devolucoesSaberRate: 0.05,           // 5%
     
     // Tributos sobre Receita Bruta Recebida
     royaltiesRate: 0.15,                  // 15%
@@ -368,20 +373,16 @@ export const defaultInputs: SimulationInputs = {
     // Esses são valores padrão editáveis — as fórmulas não foram alteradas.
     cspExecutarSquadMensal: 73000,        // R$ 73.000/squad/mês
     cspExecutarCapacidadeClientes: 20,    // 20 clientes/squad
-    // Rampa: Q1=11200, Q2=12100, Q3=13100, Q4=14000 (meta)
-    cspExecutarCoordenador: [11200, 11200, 11200, 12100, 12100, 12100, 13100, 13100, 13100, 14000, 14000, 14000],
-    // Rampa: Q1=5200, Q2=5600, Q3=6100, Q4=6500 (meta)
-    cspExecutarAccountSr: [5200, 5200, 5200, 5600, 5600, 5600, 6100, 6100, 6100, 6500, 6500, 6500],
-    cspExecutarGestorTrafegoSr: [5200, 5200, 5200, 5600, 5600, 5600, 6100, 6100, 6100, 6500, 6500, 6500],
-    cspExecutarGestorTrafegoPl: [5200, 5200, 5200, 5600, 5600, 5600, 6100, 6100, 6100, 6500, 6500, 6500],
-    // Rampa: Q1=4000, Q2=4300, Q3=4700, Q4=5000 (meta)
-    cspExecutarCopywriter: [4000, 4000, 4000, 4300, 4300, 4300, 4700, 4700, 4700, 5000, 5000, 5000],
-    // Rampa: Q1=4800, Q2=5200, Q3=5600, Q4=6000 (meta)
-    cspExecutarDesignerSr: [4800, 4800, 4800, 5200, 5200, 5200, 5600, 5600, 5600, 6000, 6000, 6000],
-    // Rampa: Q1=3600, Q2=3900, Q3=4200, Q4=4500 (meta)
+    // Rampa: Q1 values adjusted to match provided spreadsheet (Jan/Feb/Mar)
+    // Q1 and Q4 preserved; Q2/Q3 smoothed (linear 1/3 and 2/3 interpolation)
+    cspExecutarCoordenador: [9000, 9000, 9000, 10667, 10667, 10667, 12333, 12333, 12333, 14000, 14000, 14000],
+    cspExecutarAccountSr: [5000, 5000, 5000, 5500, 5500, 5500, 6000, 6000, 6000, 6500, 6500, 6500],
+    cspExecutarGestorTrafegoSr: [5000, 5000, 5000, 5500, 5500, 5500, 6000, 6000, 6000, 6500, 6500, 6500],
+    cspExecutarGestorTrafegoPl: [5000, 5000, 5000, 5500, 5500, 5500, 6000, 6000, 6000, 6500, 6500, 6500],
+    cspExecutarCopywriter: [5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000],
+    cspExecutarDesignerSr: [4600, 4600, 4600, 5067, 5067, 5067, 5533, 5533, 5533, 6000, 6000, 6000],
     cspExecutarDesignerPl: [3600, 3600, 3600, 3900, 3900, 3900, 4200, 4200, 4200, 4500, 4500, 4500],
-    // Rampa: Q1=4000, Q2=4300, Q3=4700, Q4=5000 (meta)
-    cspExecutarSocialMedia: [4000, 4000, 4000, 4300, 4300, 4300, 4700, 4700, 4700, 5000, 5000, 5000],
+    cspExecutarSocialMedia: [4000, 4000, 4000, 4333, 4333, 4333, 4667, 4667, 4667, 5000, 5000, 5000],
     
     // SQUAD SABER (9 pessoas, atende 15 clientes)
     // Observação: valores ajustados com rampa trimestral crescente.
@@ -389,28 +390,21 @@ export const defaultInputs: SimulationInputs = {
     // Esses são valores padrão editáveis — as fórmulas não foram alteradas.
     cspSaberSquadMensal: 80238,           // R$ 80.238/squad/mês
     cspSaberCapacidadeClientes: 15,       // 15 clientes/squad
-    // Rampa: Q1=16000, Q2=17300, Q3=18700, Q4=20000 (meta)
-    cspSaberCoordenador: [16000, 16000, 16000, 17300, 17300, 17300, 18700, 18700, 18700, 20000, 20000, 20000],
-    // Rampa: Q1=10000, Q2=10800, Q3=11700, Q4=12500 (meta)
-    cspSaberAccountSr: [10000, 10000, 10000, 10800, 10800, 10800, 11700, 11700, 11700, 12500, 12500, 12500],
-    // Rampa: Q1=4000, Q2=4300, Q3=4700, Q4=5000 (meta)
-    cspSaberAccountJr: [4000, 4000, 4000, 4300, 4300, 4300, 4700, 4700, 4700, 5000, 5000, 5000],
-    // Rampa: Q1=8000, Q2=8700, Q3=9300, Q4=10000 (meta)
-    cspSaberGestorTrafegoPl: [8000, 8000, 8000, 8700, 8700, 8700, 9300, 9300, 9300, 10000, 10000, 10000],
-    // Rampa: Q1=6400, Q2=6900, Q3=7500, Q4=8000 (meta)
-    cspSaberCopywriter: [6400, 6400, 6400, 6900, 6900, 6900, 7500, 7500, 7500, 8000, 8000, 8000],
-    cspSaberDesignerSr: [6400, 6400, 6400, 6900, 6900, 6900, 7500, 7500, 7500, 8000, 8000, 8000],
-    // Rampa: Q1=2200, Q2=2400, Q3=2600, Q4=2738 (meta arredondado)
-    cspSaberTech: [2200, 2200, 2200, 2400, 2400, 2400, 2600, 2600, 2600, 2738, 2738, 2738],
-    // Rampa: Q1=6400, Q2=6900, Q3=7500, Q4=8000 (meta)
-    cspSaberAccountPl: [6400, 6400, 6400, 6900, 6900, 6900, 7500, 7500, 7500, 8000, 8000, 8000],
-    // Rampa: Q1=4800, Q2=5200, Q3=5600, Q4=6000 (meta)
+    // Rampa: Q1 values adjusted to match provided spreadsheet (Jan/Feb/Mar)
+    cspSaberCoordenador: [9000, 9000, 9000, 12667, 12667, 12667, 16333, 16333, 16333, 20000, 20000, 20000],
+    cspSaberAccountSr: [5000, 5000, 5000, 7500, 7500, 7500, 10000, 10000, 10000, 12500, 12500, 12500],
+    cspSaberAccountJr: [4000, 4000, 4000, 4333, 4333, 4333, 4667, 4667, 4667, 5000, 5000, 5000],
+    cspSaberGestorTrafegoPl: [5000, 5000, 5000, 6667, 6667, 6667, 8333, 8333, 8333, 10000, 10000, 10000],
+    cspSaberCopywriter: [5000, 5000, 5000, 6000, 6000, 6000, 7000, 7000, 7000, 8000, 8000, 8000],
+    cspSaberDesignerSr: [4600, 4600, 4600, 5733, 5733, 5733, 6867, 6867, 6867, 8000, 8000, 8000],
+    cspSaberTech: [2200, 2200, 2200, 2380, 2380, 2380, 2560, 2560, 2560, 2738, 2738, 2738],
+    cspSaberAccountPl: [5000, 5000, 5000, 6000, 6000, 6000, 7000, 7000, 7000, 8000, 8000, 8000],
     cspSaberSalesEnablement: [4800, 4800, 4800, 5200, 5200, 5200, 5600, 5600, 5600, 6000, 6000, 6000],
     
     // Outros CSP
     cspCssWebProducts: 23000,             // Fixo em R$ 23k/mês
     // Rampa: Q1=60k, Q2=70k, Q3=80k, Q4=90k
-    cspGerentes: [60000, 60000, 60000, 70000, 70000, 70000, 80000, 80000, 80000, 90000, 90000, 90000],
+    cspGerentes: [60000, 60000, 60000, 60000, 60000, 60000, 60000, 60000, 60000, 60000, 60000, 60000],
     
     // TER usa estrutura similar ao Saber
     cspTerUsaSaberSquad: true,            // Ter usa a mesma estrutura de squad Saber
@@ -418,8 +412,8 @@ export const defaultInputs: SimulationInputs = {
     // Despesas Marketing e Vendas
     folhaGestaoComercial: 32500,          // R$ 32.500/mês
     comissaoMediaPorCliente: 2500,        // R$ 2.500/cliente (média ponderada)
-    salarioCloser: 9000,                  // R$ 9.000/closer
-    salarioSDR: 4500,                     // R$ 4.500/SDR
+    salarioCloser: 5000,                  // R$ 5.000/closer
+    salarioSDR: 3500,                     // R$ 3.500/SDR
     despesasVisitas: 2000,                // R$ 2.000/mês
     
     // Despesas Administrativas (valores fixos mensais)
@@ -430,7 +424,7 @@ export const defaultInputs: SimulationInputs = {
     despesasPessoasInicial: 73500,        // R$ 73.500 (mês 1)
     despesasPessoasIncremento: 1750,      // R$ 1.750/mês (incremento mensal)
     viagensAdmin: 10000,                  // R$ 10.000
-    despesasSoftwares: 60000,             // R$ 60.000,00
+    despesasSoftwares: 40000,             // R$ 40.000,00
     despesasServicosTerceirizados: 25246.50, // R$ 25.246,50
     
     // Financeiro

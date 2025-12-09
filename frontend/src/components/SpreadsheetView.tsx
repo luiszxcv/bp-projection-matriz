@@ -230,6 +230,17 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
     });
   };
 
+  // Update top-level capacityPlan scalar (ex: initialHCSaber, availabilityFactor)
+  const updateCapacityScalar = (key: string, value: number) => {
+    onUpdate({
+      ...inputs,
+      capacityPlan: {
+        ...inputs.capacityPlan,
+        [key]: value,
+      } as any,
+    });
+  };
+
   // Update role hours per tier
   const updateRoleHours = (
     squad: 'saberSquad' | 'executarSquad',
@@ -497,7 +508,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             {MONTHS.map((month) => (
               <ColumnHeader key={month} label={month} />
             ))}
-            <ColumnHeader label="Total" className="bg-primary/20 font-bold" />
+            <ColumnHeader label="Total" className="spreadsheet-grand-total" />
           </div>
 
           {/* TOPLINE SECTION */}
@@ -509,7 +520,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
               onToggle={() => toggleSection('topline')}
             />
             {[...Array(13)].map((_, i) => (
-              <div key={i} className="spreadsheet-cell bg-primary/10" />
+              <div key={i} className="spreadsheet-cell spreadsheet-total" />
             ))}
           </div>
 
@@ -553,7 +564,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
               <SpreadsheetCell
                 value={inputs.topline.investmentMonthly.reduce((s, n) => s + (n || 0), 0)}
                 format="currency"
-                className="bg-primary/10 font-semibold"
+                className="spreadsheet-total"
               />
           </div>
 
@@ -572,7 +583,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={inputs.topline.cplMonthly.reduce((s, n) => s + (n || 0), 0) / 12}
               format="currency"
-              className="bg-primary/10"
+              className="spreadsheet-total"
             />
           </div>
 
@@ -612,7 +623,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={annualTotals.totalMQLs}
               format="number"
-              className="bg-primary/10 font-semibold"
+              className="spreadsheet-total"
             />
           </div>
             </>
@@ -644,7 +655,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
               )}
             </div>
             {[...Array(13)].map((_, i) => (
-              <div key={i} className="spreadsheet-cell bg-primary/10" />
+              <div key={i} className="spreadsheet-cell spreadsheet-total" />
             ))}
           </div>
 
@@ -671,13 +682,15 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     format="percentage"
                   />
                 ))}
-                <SpreadsheetCell
-                  value={inputs.tierMetrics[tier].mqlDistribution.reduce((s, n) => s + n, 0) / 12}
-                  format="percentage"
-                  className="bg-primary/10"
-                />
+                  <SpreadsheetCell
+                    value={inputs.tierMetrics[tier].mqlDistribution.reduce((s, n) => s + n, 0) / 12}
+                    format="percentage"
+                    className="spreadsheet-total"
+                  />
               </div>
               )}
+
+              
 
               {/* MQLs - results */}
               {(funnelFilter === 'all' || funnelFilter === 'results') && (
@@ -689,7 +702,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 <SpreadsheetCell
                   value={monthlyData.reduce((sum, m) => sum + m.mqls[tier], 0)}
                   format="number"
-                  className="bg-primary/10 font-semibold"
+                  className="spreadsheet-total"
                 />
               </div>
               )}
@@ -710,7 +723,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 <SpreadsheetCell
                   value={inputs.tierMetrics[tier].mqlToSqlRate.reduce((s, n) => s + n, 0) / 12}
                   format="percentage"
-                  className="bg-primary/10"
+                  className="spreadsheet-total"
                 />
               </div>
               )}
@@ -725,7 +738,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 <SpreadsheetCell
                   value={monthlyData.reduce((sum, m) => sum + m.sqls[tier], 0)}
                   format="number"
-                  className="bg-primary/10 font-semibold"
+                  className="spreadsheet-total"
                 />
               </div>
               )}
@@ -746,7 +759,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 <SpreadsheetCell
                   value={inputs.tierMetrics[tier].sqlToSalRate.reduce((s, n) => s + n, 0) / 12}
                   format="percentage"
-                  className="bg-primary/10"
+                  className="spreadsheet-total"
                 />
               </div>
               )}
@@ -761,7 +774,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 <SpreadsheetCell
                   value={monthlyData.reduce((sum, m) => sum + m.sals[tier], 0)}
                   format="number"
-                  className="bg-primary/10 font-semibold"
+                  className="spreadsheet-total"
                 />
               </div>
               )}
@@ -782,7 +795,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 <SpreadsheetCell
                   value={inputs.tierMetrics[tier].salToWonRate.reduce((s, n) => s + n, 0) / 12}
                   format="percentage"
-                  className="bg-primary/10"
+                  className="spreadsheet-total"
                 />
               </div>
               )}
@@ -797,7 +810,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 <SpreadsheetCell
                   value={monthlyData.reduce((sum, m) => sum + m.wons[tier], 0)}
                   format="number"
-                  className="bg-primary/10 font-semibold"
+                  className="spreadsheet-total"
                 />
               </div>
               )}
@@ -818,7 +831,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 <SpreadsheetCell
                   value={inputs.tierMetrics[tier].activationRate.reduce((s, n) => s + n, 0) / 12}
                   format="percentage"
-                  className="bg-primary/10"
+                  className="spreadsheet-total"
                 />
               </div>
               )}
@@ -833,7 +846,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 <SpreadsheetCell
                   value={monthlyData.reduce((sum, m) => sum + m.activations[tier], 0)}
                   format="number"
-                  className="bg-primary/10 font-semibold"
+                  className="spreadsheet-total"
                 />
               </div>
               )}
@@ -859,7 +872,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     <SpreadsheetCell
                       value={monthlyData.reduce((sum, m) => sum + m.directActivations[tier][product], 0)}
                       format="number"
-                      className="bg-primary/10 font-semibold"
+                      className="spreadsheet-total"
                     />
                   </div>
                   )}
@@ -884,7 +897,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     <SpreadsheetCell
                       value={inputs.tierMetrics[tier].productDistribution[product].reduce((s, n) => s + n, 0) / 12}
                       format="percentage"
-                      className="bg-primary/10"
+                      className="spreadsheet-total"
                     />
                   </div>
                   )}
@@ -909,7 +922,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     <SpreadsheetCell
                       value={inputs.tierMetrics[tier].productTickets[product].reduce((s, n) => s + n, 0) / 12}
                       format="currency"
-                      className="bg-primary/10"
+                      className="spreadsheet-total"
                     />
                   </div>
                   )}
@@ -933,7 +946,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     <SpreadsheetCell
                       value={monthlyData.reduce((sum, m) => sum + m.revenueByTierProduct[tier][product], 0)}
                       format="currency"
-                      className="bg-primary/10 font-semibold"
+                      className="spreadsheet-total"
                     />
                   </div>
                   
@@ -974,7 +987,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
               onToggle={() => toggleSection('conversionRates')}
             />
             {[...Array(13)].map((_, i) => (
-              <div key={i} className="spreadsheet-cell bg-primary/10" />
+              <div key={i} className="spreadsheet-cell spreadsheet-total" />
             ))}
           </div>
 
@@ -994,7 +1007,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={inputs.conversionRates.saberToExecutar}
               format="percentage"
-              className="bg-primary/10"
+              className="spreadsheet-total"
             />
           </div>
 
@@ -1012,7 +1025,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={inputs.conversionRates.executarLoyaltyRatio}
               format="percentage"
-              className="bg-primary/10"
+              className="spreadsheet-total"
             />
           </div>
 
@@ -1030,7 +1043,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={inputs.conversionRates.loyaltyDuration}
               format="number"
-              className="bg-primary/10"
+              className="spreadsheet-total"
             />
           </div>
 
@@ -1048,7 +1061,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={inputs.conversionRates.loyaltyRenewalRate}
               format="percentage"
-              className="bg-primary/10"
+              className="spreadsheet-total"
             />
           </div>
 
@@ -1066,7 +1079,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={inputs.conversionRates.loyaltyMaxRenewals}
               format="number"
-              className="bg-primary/10"
+              className="spreadsheet-total"
             />
           </div>
 
@@ -1084,7 +1097,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={inputs.conversionRates.noLoyaltyDuration}
               format="number"
-              className="bg-primary/10"
+              className="spreadsheet-total"
             />
           </div>
 
@@ -1102,7 +1115,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={inputs.conversionRates.noLoyaltyRenewalRate}
               format="percentage"
-              className="bg-primary/10"
+              className="spreadsheet-total"
             />
           </div>
 
@@ -1120,7 +1133,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={inputs.conversionRates.noLoyaltyMaxRenewals}
               format="number"
-              className="bg-primary/10"
+              className="spreadsheet-total"
             />
           </div>
 
@@ -1138,7 +1151,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={inputs.conversionRates.expansionRate}
               format="percentage"
-              className="bg-primary/10"
+              className="spreadsheet-total"
             />
           </div>
             </>
@@ -1153,7 +1166,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
               onToggle={() => toggleSection('renewals')}
             />
             {[...Array(13)].map((_, i) => (
-              <div key={i} className="spreadsheet-cell bg-primary/10" />
+              <div key={i} className="spreadsheet-cell spreadsheet-total" />
             ))}
           </div>
 
@@ -1186,7 +1199,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     <SpreadsheetCell
                       value={monthlyData.reduce((sum, m) => sum + m.renewals[tier][product], 0)}
                       format="number"
-                      className="bg-primary/10 font-semibold"
+                      className="spreadsheet-total"
                     />
                   </div>
                   <div className="flex row-hover">
@@ -1205,7 +1218,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     <SpreadsheetCell
                       value={monthlyData.reduce((sum, m) => sum + m.renewalRevenue[tier][product], 0)}
                       format="currency"
-                      className="bg-primary/10 font-semibold"
+                      className="spreadsheet-total"
                     />
                   </div>
                 </React.Fragment>
@@ -1222,7 +1235,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
               onToggle={() => toggleSection('activeBaseExpansions')}
             />
             {[...Array(13)].map((_, i) => (
-              <div key={i} className="spreadsheet-cell bg-primary/10" />
+              <div key={i} className="spreadsheet-cell spreadsheet-total" />
             ))}
           </div>
 
@@ -1247,7 +1260,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     <SpreadsheetCell
                       value={monthlyData.reduce((sum, m) => sum + m.conversions[tier].loyalty + m.conversions[tier].noLoyalty, 0)}
                       format="number"
-                      className="bg-primary/10 font-semibold"
+                      className="spreadsheet-total"
                     />
                   </div>
                   <div className="flex row-hover">
@@ -1321,7 +1334,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                       return tSum + (isNaN(totalRev) ? 0 : totalRev);
                     }, 0), 0)}
                   format="currency"
-                  className="bg-primary/10 font-semibold"
+                  className="spreadsheet-total"
                 />
               </div>
             </>
@@ -1369,7 +1382,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     <SpreadsheetCell
                       value={monthlyData.reduce((sum, m) => sum + m.expansions[tier][product], 0)}
                       format="number"
-                      className="bg-primary/10 font-semibold"
+                      className="spreadsheet-total"
                     />
                   </div>
                   <div className="flex row-hover">
@@ -1388,7 +1401,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     <SpreadsheetCell
                       value={monthlyData.reduce((sum, m) => sum + m.expansionRevenue[tier][product], 0)}
                       format="currency"
-                      className="bg-primary/10 font-semibold"
+                      className="spreadsheet-total"
                     />
                   </div>
                 </React.Fragment>
@@ -1425,7 +1438,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={inputs.legacyBase.churnRate}
               format="percentage"
-              className="bg-primary/10"
+              className="spreadsheet-total"
             />
           </div>
 
@@ -1443,7 +1456,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={inputs.legacyBase.expansionRate}
               format="percentage"
-              className="bg-primary/10"
+              className="spreadsheet-total"
             />
           </div>
 
@@ -1463,7 +1476,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 <SpreadsheetCell
                   value={inputs.legacyBase[tier].clients}
                   format="number"
-                  className="bg-primary/10"
+                  className="spreadsheet-total"
                 />
               </div>
 
@@ -1480,7 +1493,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                 <SpreadsheetCell
                   value={monthlyData[11]?.legacyClients[tier] || 0}
                   format="number"
-                  className="bg-primary/10 font-semibold"
+                  className="spreadsheet-total"
                 />
               </div>
 
@@ -1543,7 +1556,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     key={i}
                     value={m.legacyRevenue[tier]}
                     format="currency"
-                    className="bg-primary/5 font-semibold"
+                    className="spreadsheet-total"
                   />
                 ))}
                 <SpreadsheetCell
@@ -1568,7 +1581,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                   <SpreadsheetCell
                     value={monthlyData.reduce((sum, m) => sum + m.legacyExpansionByProduct[tier][product], 0)}
                     format="currency"
-                    className="bg-primary/10 text-xs"
+                    className="spreadsheet-total text-xs"
                   />
                 </div>
               ))}
@@ -1576,7 +1589,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
           ))}
 
           {/* Totais Consolidados Base Legada */}
-          <div className="flex row-hover bg-primary/10">
+          <div className="flex row-hover spreadsheet-total">
             <RowHeader label="TOTAL # Clientes Base Legada" tooltip="Total de clientes da base legada (todos os tiers)" className="font-bold" />
             {monthlyData.map((m, i) => (
               <SpreadsheetCell
@@ -1589,11 +1602,11 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={monthlyData[11] ? TIERS.reduce((sum, tier) => sum + monthlyData[11].legacyClients[tier], 0) : 0}
               format="number"
-              className="bg-primary/20 font-bold"
+              className="spreadsheet-grand-total"
             />
           </div>
 
-          <div className="flex row-hover bg-primary/10">
+          <div className="flex row-hover spreadsheet-total">
             <RowHeader label="TOTAL $ Receita Base Legada SC" tooltip="Total de receita recorrente da base legada SEM CHURN (sem expansão)" className="font-bold" />
             {monthlyData.map((m, i) => (
               <SpreadsheetCell
@@ -1606,11 +1619,11 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={monthlyData.reduce((sum, m) => sum + TIERS.reduce((s, tier) => s + m.legacyRevenueBeforeChurn[tier], 0), 0)}
               format="currency"
-              className="bg-primary/20 font-bold"
+              className="spreadsheet-grand-total"
             />
           </div>
 
-          <div className="flex row-hover bg-primary/10">
+          <div className="flex row-hover spreadsheet-total">
             <RowHeader label="TOTAL $ Receita Base Legada CC" tooltip="Total de receita recorrente da base legada COM CHURN (sem expansão)" className="font-bold" />
             {monthlyData.map((m, i) => (
               <SpreadsheetCell
@@ -1623,11 +1636,11 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={monthlyData.reduce((sum, m) => sum + TIERS.reduce((s, tier) => s + (m.legacyRevenue[tier] - m.legacyExpansionRevenue[tier]), 0), 0)}
               format="currency"
-              className="bg-primary/20 font-bold"
+              className="spreadsheet-grand-total"
             />
           </div>
 
-          <div className="flex row-hover bg-primary/10">
+          <div className="flex row-hover spreadsheet-total">
             <RowHeader label="TOTAL $ Expansão Legada" tooltip="Total de receita de expansão da base legada" className="font-bold" />
             {monthlyData.map((m, i) => (
               <SpreadsheetCell
@@ -1640,11 +1653,11 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={monthlyData.reduce((sum, m) => sum + TIERS.reduce((s, tier) => s + m.legacyExpansionRevenue[tier], 0), 0)}
               format="currency"
-              className="bg-primary/20 font-bold"
+              className="spreadsheet-grand-total"
             />
           </div>
 
-          <div className="flex row-hover bg-primary/20">
+          <div className="flex row-hover spreadsheet-grand-total">
             <RowHeader label="TOTAL $ Receita Total Base Legada" tooltip="Total geral da receita da base legada (base + expansão)" className="font-bold" />
             {monthlyData.map((m, i) => (
               <SpreadsheetCell
@@ -1657,7 +1670,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={monthlyData.reduce((sum, m) => sum + m.totalLegacyRevenue, 0)}
               format="currency"
-              className="bg-primary/30 font-bold text-lg"
+              className="spreadsheet-grand-total text-lg"
             />
           </div>
             </>
@@ -1672,7 +1685,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
               onToggle={() => toggleSection('totals')}
             />
             {[...Array(13)].map((_, i) => (
-              <div key={i} className="spreadsheet-cell bg-primary/10" />
+              <div key={i} className="spreadsheet-cell spreadsheet-total" />
             ))}
           </div>
 
@@ -2418,9 +2431,63 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
 
           {expandedSections.capacityPlan && (
             <>
-          {/* Parâmetros Squad Saber */}
+          {/* Base legada e parâmetros globais da Capacity */}
+          <div className="flex row-hover">
+            <RowHeader label="Base Legada - HC Saber" tooltip="HC já existente (Saber)" className="pl-6 bg-muted/30" />
+            {MONTHS.map((_, i) => (
+              <SpreadsheetCell
+                key={i}
+                value={inputs.capacityPlan.initialHCSaber}
+                onChange={(v) => updateCapacityScalar('initialHCSaber', v)}
+                editable
+                format="number"
+              />
+            ))}
+            <SpreadsheetCell
+              value={inputs.capacityPlan.initialHCSaber}
+              format="number"
+              className="bg-primary/10"
+            />
+          </div>
+
+          <div className="flex row-hover">
+            <RowHeader label="Base Legada - HC Executar" tooltip="HC já existente (Executar)" className="pl-6 bg-muted/30" />
+            {MONTHS.map((_, i) => (
+              <SpreadsheetCell
+                key={i}
+                value={inputs.capacityPlan.initialHCExecutar}
+                onChange={(v) => updateCapacityScalar('initialHCExecutar', v)}
+                editable
+                format="number"
+              />
+            ))}
+            <SpreadsheetCell
+              value={inputs.capacityPlan.initialHCExecutar}
+              format="number"
+              className="bg-primary/10"
+            />
+          </div>
+
+          <div className="flex row-hover">
+            <RowHeader label="Fator Disponibilidade" tooltip="Fator (0..1) de disponibilidade/eficiência (ex: 0.85)" className="pl-6 bg-muted/30" />
+            {MONTHS.map((_, i) => (
+              <SpreadsheetCell
+                key={i}
+                value={inputs.capacityPlan.availabilityFactor ?? 0.85}
+                onChange={(v) => updateCapacityScalar('availabilityFactor', v)}
+                editable
+                format="number"
+              />
+            ))}
+            <SpreadsheetCell
+              value={inputs.capacityPlan.availabilityFactor ?? 0.85}
+              format="number"
+              className="bg-primary/10"
+            />
+          </div>
+          {/* Parâmetros Coordenação Saber */}
           <div className="flex">
-            <RowHeader label="Squad Saber - Horas por Cargo/Tier" level="tier" tier="enterprise" />
+            <RowHeader label="Coordenação Saber - Horas por Cargo/Tier" level="tier" tier="enterprise" />
             {[...Array(13)].map((_, i) => (
               <div key={i} className="spreadsheet-cell tier-enterprise" />
             ))}
@@ -2458,9 +2525,9 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             </React.Fragment>
           ))}
 
-          {/* Squad Config */}
+          {/* Config Coordenação */}
           <div className="flex row-hover">
-            <RowHeader label="HC por Squad" tooltip="Pessoas por squad" className="pl-6 bg-muted/30" />
+            <RowHeader label="HC por Coordenação" tooltip="Pessoas por coordenação" className="pl-6 bg-muted/30" />
             {MONTHS.map((_, i) => (
               <SpreadsheetCell
                 key={i}
@@ -2497,9 +2564,9 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
 
 
 
-          {/* Parâmetros Squad Executar */}
+          {/* Parâmetros Coordenação Executar */}
           <div className="flex">
-            <RowHeader label="Squad Executar - Horas por Cargo/Tier" level="tier" tier="large" />
+            <RowHeader label="Coordenação Executar - Horas por Cargo/Tier" level="tier" tier="large" />
             {[...Array(13)].map((_, i) => (
               <div key={i} className="spreadsheet-cell tier-large" />
             ))}
@@ -2537,9 +2604,9 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             </React.Fragment>
           ))}
 
-          {/* Squad Config */}
+          {/* Config Coordenação */}
           <div className="flex row-hover">
-            <RowHeader label="HC por Squad" tooltip="Pessoas por squad" className="pl-6 bg-muted/30" />
+            <RowHeader label="HC por Coordenação" tooltip="Pessoas por coordenação" className="pl-6 bg-muted/30" />
             {MONTHS.map((_, i) => (
               <SpreadsheetCell
                 key={i}
@@ -2971,7 +3038,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={monthlyData.reduce((sum, m) => sum + m.capacityPlan.redeployableFromExecutar, 0)}
               format="number"
-              className="bg-white"
+              className="spreadsheet-total"
             />
           </div>
 
@@ -3044,7 +3111,7 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
             <SpreadsheetCell
               value={monthlyData.reduce((sum, m) => sum + (m.capacityPlan.salesHires ?? 0), 0)}
               format="number"
-              className="bg-white font-semibold"
+              className="spreadsheet-total"
             />
           </div>
 
@@ -3241,6 +3308,20 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                   />
                 ))}
                 <SpreadsheetCell value={inputs.dreConfig.churnRecebimentoOPSRate} format="percentage" className="bg-primary/10" />
+              </div>
+
+              <div className="flex row-hover">
+                <RowHeader label="% Devoluções Saber" className="pl-4" tooltip="Percentual de devoluções aplicado sobre a receita de aquisição do produto Saber" />
+                {[...Array(12)].map((_, i) => (
+                  <SpreadsheetCell
+                    key={i}
+                    value={inputs.dreConfig.devolucoesSaberRate}
+                    format="percentage"
+                    editable
+                    onChange={(val) => onUpdate({ ...inputs, dreConfig: { ...inputs.dreConfig, devolucoesSaberRate: val } })}
+                  />
+                ))}
+                <SpreadsheetCell value={inputs.dreConfig.devolucoesSaberRate} format="percentage" className="bg-primary/10" />
               </div>
 
               <div className="flex row-hover">
@@ -3625,17 +3706,17 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                   </div>
 
                   <div className="flex row-hover">
-                    <RowHeader label="Comissão Operação" className="pl-4" tooltip="Comissão da operação" />
+                    <RowHeader label="Comissão Monetização Ops (%)" className="pl-4" tooltip="Percentual aplicado sobre o total de expansão (inclui base legada)" />
                     {[...Array(12)].map((_, i) => (
                       <SpreadsheetCell
                         key={i}
-                        value={inputs.salesConfig.comissaoOperacao}
-                        format="currency"
+                        value={inputs.salesConfig.comissaoMonetizacaoOpsRate}
+                        format="percentage"
                         editable
-                        onChange={(val) => onUpdate({ ...inputs, salesConfig: { ...inputs.salesConfig, comissaoOperacao: val } })}
+                        onChange={(val) => onUpdate({ ...inputs, salesConfig: { ...inputs.salesConfig, comissaoMonetizacaoOpsRate: val } })}
                       />
                     ))}
-                    <SpreadsheetCell value={inputs.salesConfig.comissaoOperacao * 12} format="currency" className="bg-primary/10 font-semibold" />
+                    <SpreadsheetCell value={inputs.salesConfig.comissaoMonetizacaoOpsRate} format="percentage" className="bg-primary/10 font-semibold" />
                   </div>
 
                   <div className="flex row-hover">
@@ -4351,6 +4432,8 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                     />
                   </div>
 
+                  {/* Devoluções Saber (moved below to be always visible) */}
+
                   <div className="flex row-hover">
                     <RowHeader label="(%) Performance Conversão" className="pl-6" tooltip="Percentual efetivamente recebido após deduções" />
                     {monthlyData.map((m, i) => (
@@ -4364,6 +4447,19 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                   </div>
                 </>
               )}
+
+                  {/* Devoluções Saber (sempre visível e aplicada) */}
+                  <div className="flex row-hover">
+                    <RowHeader label="(-) Devoluções Saber" className="pl-6" tooltip={`${((inputs.dreConfig.devolucoesSaberRate ?? 0) * 100).toFixed(1)}% sobre Receita Saber (aquisição)`} />
+                    {monthlyData.map((m, i) => (
+                      <SpreadsheetCell key={i} value={m.dre.devolucoesSaber} format="currency" className="text-destructive" />
+                    ))}
+                    <SpreadsheetCell
+                      value={monthlyData.reduce((sum, m) => sum + m.dre.devolucoesSaber, 0)}
+                      format="currency"
+                      className="bg-primary/10 text-destructive"
+                    />
+                  </div>
 
               <div className="flex row-hover bg-primary/10">
                 <RowHeader label="(=) RECEITA BRUTA" className="pl-6 font-semibold" />
@@ -4623,16 +4719,23 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
               {/* ========== MARKETING E VENDAS ========== */}
               <div className="flex row-hover mt-4">
                 <RowHeader label="(-) Despesas Marketing e Vendas" className="pl-6 font-semibold" />
-                {monthlyData.map((m, i) => (
-                  <SpreadsheetCell 
-                    key={i} 
-                    value={inputs.topline.investmentMonthly[i] + m.dre.salesMetrics.totalDespesasMarketingVendas} 
-                    format="currency" 
-                    className="font-bold text-destructive" 
-                  />
-                ))}
+                {monthlyData.map((m, i) => {
+                  const investmentDisplay = inputs.dreConfig.usarLinhasGerenciais
+                    ? m.dre.investimentoMarketingAmortizado
+                    : inputs.topline.investmentMonthly[i];
+                  return (
+                    <SpreadsheetCell
+                      key={i}
+                      value={investmentDisplay + m.dre.salesMetrics.totalDespesasMarketingVendas}
+                      format="currency"
+                      className="font-bold text-destructive"
+                    />
+                  );
+                })}
                 <SpreadsheetCell
-                  value={inputs.topline.investmentMonthly.reduce((sum, v) => sum + v, 0) + monthlyData.reduce((sum, m) => sum + m.dre.salesMetrics.totalDespesasMarketingVendas, 0)}
+                  value={(inputs.dreConfig.usarLinhasGerenciais
+                    ? monthlyData.reduce((s, m) => s + (m.dre.investimentoMarketingAmortizado || 0), 0)
+                    : inputs.topline.investmentMonthly.reduce((sum, v) => sum + v, 0)) + monthlyData.reduce((sum, m) => sum + m.dre.salesMetrics.totalDespesasMarketingVendas, 0)}
                   format="currency"
                   className="bg-primary/10 font-semibold text-destructive"
                 />
@@ -4640,11 +4743,16 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
 
               <div className="flex row-hover">
                 <RowHeader label="(-) Investimento Marketing" className="pl-10" tooltip="Investimento em aquisição de leads (do BP)" />
-                {monthlyData.map((m, i) => (
-                  <SpreadsheetCell key={i} value={inputs.topline.investmentMonthly[i]} format="currency" />
-                ))}
+                {monthlyData.map((m, i) => {
+                  const investmentDisplay = inputs.dreConfig.usarLinhasGerenciais
+                    ? m.dre.investimentoMarketingAmortizado
+                    : inputs.topline.investmentMonthly[i];
+                  return <SpreadsheetCell key={i} value={investmentDisplay} format="currency" />;
+                })}
                 <SpreadsheetCell
-                  value={inputs.topline.investmentMonthly.reduce((sum, v) => sum + v, 0)}
+                  value={inputs.dreConfig.usarLinhasGerenciais
+                    ? monthlyData.reduce((s, m) => s + (m.dre.investimentoMarketingAmortizado || 0), 0)
+                    : inputs.topline.investmentMonthly.reduce((sum, v) => sum + v, 0)}
                   format="currency"
                   className="bg-primary/10"
                 />
@@ -5337,7 +5445,9 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                   <SpreadsheetCell key={i} value={m.dre.cac} format="currency" />
                 ))}
                 <SpreadsheetCell
-                  value={monthlyData.reduce((sum, m) => sum + m.dre.investimentoMarketing, 0) / monthlyData.reduce((sum, m) => sum + TIERS.reduce((s, t) => s + m.wons[t], 0), 0)}
+                  value={(inputs.dreConfig.usarLinhasGerenciais
+                    ? monthlyData.reduce((s, m) => s + (m.dre.investimentoMarketingAmortizado || 0), 0)
+                    : inputs.topline.investmentMonthly.reduce((s, v) => s + v, 0)) / monthlyData.reduce((sum, m) => sum + TIERS.reduce((s, t) => s + m.wons[t], 0), 0)}
                   format="currency"
                   className="bg-primary/10"
                 />

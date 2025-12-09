@@ -171,6 +171,15 @@
   .tier-header {
     @apply px-3 py-1.5 text-[11px] font-semibold border-r border-b border-[hsl(var(--border-grid))] sticky left-0 z-20 w-[260px] min-w-[260px] max-w-[260px];
   }
+
+  /* Standardized spreadsheet total styles */
+  .spreadsheet-total {
+    @apply bg-primary/10 font-semibold;
+  }
+
+  .spreadsheet-grand-total {
+    @apply bg-primary/20 font-bold;
+  }
 }
 
 @layer utilities {
