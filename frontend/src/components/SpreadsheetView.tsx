@@ -4394,32 +4394,65 @@ const { inputs, monthlyData } = simulation;
               </div>
 
               <div className="flex row-hover">
-                <RowHeader label="$ Total de Receita" className="pl-6" tooltip="Soma visual: Ativação + Expansão + Legacy (apenas visual, não altera cálculos)" />
-                {monthlyData.map((m, i) => (
-                  <SpreadsheetCell
-                    key={i}
-                    value={((m.dre.activationRevenue || 0) + (m.dre.expansionRevenue || 0) + (m.dre.legacyRevenue || 0))}
-                    format="currency"
-                  />
-                ))}
+                <RowHeader label="Receita Executar" className="pl-6" tooltip="Receita Executar mês a mês. Respeita 'Usar Linhas Gerenciais' (DFC) quando ativado." />
+                {monthlyData.map((m, i) => {
+                  // Sum activation DFCs when using managerial lines
+                  const activationsDFC = (m.dre.activationExecutarLoyaltyDFC || 0)
+                    + (m.dre.activationExecutarNoLoyaltyDFC || 0)
+                    + (m.dre.activationSaberConvLoyaltyDFC || 0)
+                    + (m.dre.activationSaberConvNoLoyaltyDFC || 0);
+
+                  // Sum expansions and legacy expansions for Executar (product-level)
+                  const expansionsExecutar = TIERS.reduce((s, tier) => s
+                    + (m.expansionRevenue?.[tier]?.executarLoyalty || 0)
+                    + (m.expansionRevenue?.[tier]?.executarNoLoyalty || 0), 0);
+
+                  // Allocate legacy base revenue to Executar: use total legacy revenue per tier
+                  const legacyBaseExecutar = TIERS.reduce((s, tier) => s + (m.legacyRevenue?.[tier] || 0), 0);
+
+                  if (inputs.dreConfig.usarLinhasGerenciais) {
+                    // activations (DFC) + current expansions + full legacy base (legacyRevenue already includes legacy expansions)
+                    const valor = activationsDFC + expansionsExecutar + legacyBaseExecutar;
+                    return <SpreadsheetCell key={i} value={valor} format="currency" />;
+                  }
+
+                  // Fallback: competence view — product revenue + current expansions + full legacy base
+                  const revenueExecutar = TIERS.reduce((s, tier) => s
+                    + (m.revenueByTierProduct?.[tier]?.executarLoyalty || 0)
+                    + (m.revenueByTierProduct?.[tier]?.executarNoLoyalty || 0), 0);
+                  const valor = revenueExecutar + expansionsExecutar + legacyBaseExecutar;
+                  return <SpreadsheetCell key={i} value={valor} format="currency" />;
+                })}
                 <SpreadsheetCell
-                  value={monthlyData.reduce((sum, m) => sum + ((m.dre.activationRevenue || 0) + (m.dre.expansionRevenue || 0) + (m.dre.legacyRevenue || 0)), 0)}
+                  value={monthlyData.reduce((sum, m) => {
+                    const activationsDFC = (m.dre.activationExecutarLoyaltyDFC || 0)
+                      + (m.dre.activationExecutarNoLoyaltyDFC || 0)
+                      + (m.dre.activationSaberConvLoyaltyDFC || 0)
+                      + (m.dre.activationSaberConvNoLoyaltyDFC || 0);
+
+                    const expansionsExecutar = TIERS.reduce((s, tier) => s
+                      + (m.expansionRevenue?.[tier]?.executarLoyalty || 0)
+                      + (m.expansionRevenue?.[tier]?.executarNoLoyalty || 0), 0);
+
+                    const legacyExpansionsExecutar = TIERS.reduce((s, tier) => s
+                      + (m.legacyExpansionByProduct?.[tier]?.executarLoyalty || 0)
+                      + (m.legacyExpansionByProduct?.[tier]?.executarNoLoyalty || 0), 0);
+
+                    if (inputs.dreConfig.usarLinhasGerenciais) {
+                      return sum + activationsDFC + expansionsExecutar + legacyExpansionsExecutar;
+                    }
+
+                    const revenueExecutar = TIERS.reduce((s, tier) => s
+                      + (m.revenueByTierProduct?.[tier]?.executarLoyalty || 0)
+                      + (m.revenueByTierProduct?.[tier]?.executarNoLoyalty || 0), 0);
+                    return sum + revenueExecutar + expansionsExecutar + legacyExpansionsExecutar;
+                  }, 0)}
                   format="currency"
                   className="bg-primary/10"
                 />
               </div>
 
-              <div className="flex row-hover">
-                <RowHeader label="Activation" className="pl-6" tooltip="Receita de novos clientes ativados" />
-                {monthlyData.map((m, i) => (
-                  <SpreadsheetCell key={i} value={m.dre.activationRevenue} format="currency" />
-                ))}
-                <SpreadsheetCell
-                  value={monthlyData.reduce((sum, m) => sum + m.dre.activationRevenue, 0)}
-                  format="currency"
-                  className="bg-primary/10"
-                />
-              </div>
+              
 
               {/* Receita Ativação (explícita para facilitar ROAS) */}
               <div className="flex row-hover">
