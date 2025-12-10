@@ -5378,7 +5378,7 @@ const { inputs, monthlyData } = simulation;
                   {Object.keys(inputs.dreConfig.despesasAdmDetalhadas).filter(k => ![
                     'timePG','timeFinanceiro','timePP','seguroEmpresa','techRemuneracao',
                     'utilitiesSaoPaulo','aluguelV4House','aluguelPaulista','aguaPaulista','limpezaPaulista','facilites','officeCampinas','aluguelConteiner','officeIndaiatuba','flagship',
-                    'officePaulistaAjuda','campinasAjuda','ifood','odonto','transfer','saude','socios',
+                    'officePaulistaAjuda','officeV4CampAjuda','flagshipAjuda','campinasAjuda','ifood','odonto','transfer','saude','socios',
                     'despesasSoftwaresStackDigital','servicosContabilidade','servicosAuddas','gestao','financeiro','tech','vendas','endomarketing','viagensAdmin'
                   ].includes(k)).map(k => (
                     <div className="flex row-hover" key={k}>

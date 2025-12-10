@@ -464,10 +464,10 @@ export const defaultInputs: SimulationInputs = {
       officePaulistaAjuda: fill12(34205),
       // V4 Camp Ajuda de Custo (new key) - default 0
       officeV4CampAjuda: fill12(0),
-      // Flagship Ajuda de Custo (new key) - default 0
-      flagshipAjuda: fill12(0),
-      // Campinas Ajuda: Jan = 0 ; Feb = 34.300 ; Mar-Dec = 21.630
-      campinasAjuda: [0,34300,21630,21630,21630,21630,21630,21630,21630,21630,21630,21630],
+      // Flagship Ajuda de Custo: Jan-Apr = 0, May-Dec = 10.500
+      flagshipAjuda: [0,0,0,0,10500,10500,10500,10500,10500,10500,10500,10500],
+      // Campinas Ajuda de Custo: Jan-Apr = 0, May-Dec = 32.800
+      campinasAjuda: [0,0,0,0,32800,32800,32800,32800,32800,32800,32800,32800],
       ifood: fill12(1950),
       odonto: fill12(3950),
       transfer: fill12(0),
