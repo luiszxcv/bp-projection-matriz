@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Simulation, SimulationInputs, Tier, Product } from '@/types/simulation';
 import { MONTHS, TIER_LABELS, PRODUCT_LABELS } from '@/data/defaultInputs';
 import { SpreadsheetCell, RowHeader, ColumnHeader } from './SpreadsheetCell';
@@ -110,6 +110,100 @@ const { inputs, monthlyData } = simulation;
 
   const toggleChart = (chart: string) => {
     setShowCharts(prev => ({ ...prev, [chart]: !prev[chart] }));
+  };
+
+  // Simple per-simulation password protection (client-side)
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true); // default unlocked until effect runs
+  const [passwordInput, setPasswordInput] = useState('');
+  const [showSetPasswordModal, setShowSetPasswordModal] = useState(false);
+
+  // Helper: compute SHA-256 hex hash of input
+  const sha256Hex = async (text: string) => {
+    const enc = new TextEncoder();
+    const data = enc.encode(text);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
+  useEffect(() => {
+    try {
+      // If simulation.inputs.protection?.passwordHash exists, require password; else unlocked
+      const pwHash = (simulation.inputs as any)?.protection?.passwordHash;
+      if (!pwHash) setIsAuthenticated(true);
+      else setIsAuthenticated(false);
+    } catch (e) {
+      // ignore
+    }
+  }, [simulation]);
+
+  const handleUnlock = async () => {
+    try {
+      const pwHash = (simulation.inputs as any)?.protection?.passwordHash;
+      if (!pwHash) {
+        setIsAuthenticated(true);
+        return;
+      }
+      const enteredHash = await sha256Hex(passwordInput);
+      if (enteredHash === pwHash) {
+        setIsAuthenticated(true);
+        setPasswordInput('');
+      } else {
+        alert('Senha incorreta');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao verificar senha');
+    }
+  };
+
+  // Open modal to set a password and lock the simulation
+  const handleOpenSetPassword = () => {
+    setShowSetPasswordModal(true);
+    setPasswordInput('');
+  };
+
+  const handleSetPassword = async (pw: string) => {
+    try {
+      if (!pw || pw.trim() === '') {
+        alert('Senha vazia não é permitida');
+        return;
+      }
+      const hash = await sha256Hex(pw);
+      const newInputs = { ...inputs, protection: { ...(inputs as any).protection, passwordHash: hash } } as typeof inputs;
+      onUpdate(newInputs);
+      // after saving, require password
+      setIsAuthenticated(false);
+      setShowSetPasswordModal(false);
+      setPasswordInput('');
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao salvar senha');
+    }
+  };
+
+  // Remove password protection entirely (persist change)
+  const handleRemovePassword = () => {
+    try {
+      // Create a shallow copy of inputs and a new protection object to avoid mutating shared refs
+      const newInputs = { ...inputs } as any;
+      if (newInputs.protection) {
+        const newProtection = { ...newInputs.protection };
+        delete newProtection.passwordHash;
+        // If protection becomes empty, remove the property entirely
+        if (Object.keys(newProtection).length === 0) {
+          delete newInputs.protection;
+        } else {
+          newInputs.protection = newProtection;
+        }
+      }
+      onUpdate(newInputs);
+      setIsAuthenticated(true);
+      setShowSetPasswordModal(false);
+      setPasswordInput('');
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const updateInput = <K extends keyof SimulationInputs>(
@@ -603,12 +697,12 @@ const { inputs, monthlyData } = simulation;
                 {formatCurrency(annualTotals.totalRevenue)}
               </span>
             </div>
-            <div>
+            {/* <div>
               <span className="text-muted-foreground">WONs:</span>
               <span className="ml-2 font-mono text-number">
                 {formatNumber(annualTotals.totalWons)}
               </span>
-            </div>
+            </div> */}
             <div>
               <span className="text-muted-foreground">Receita Ano Anterior:</span>
               <Input
@@ -631,9 +725,57 @@ const { inputs, monthlyData } = simulation;
               <Download className="h-4 w-4" />
               Exportar Excel
             </Button>
+            {isAuthenticated && (
+              <Button onClick={handleOpenSetPassword} variant="destructive" size="sm" className="gap-2">
+                Bloquear
+              </Button>
+            )}
           </div>
         </div>
       </div>
+
+      {/* If not authenticated, show blocking modal (simple client-side password) */}
+      {!isAuthenticated && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-card p-6 rounded shadow-lg w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Esta simulação está bloqueada</h3>
+            <p className="text-sm text-muted-foreground mb-4">Insira a senha para acessar esta tela.</p>
+            <Input
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              placeholder="Senha"
+              className="mb-4"
+            />
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => { setPasswordInput(''); }}>Limpar</Button>
+              <Button size="sm" onClick={handleUnlock}>Entrar</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set password modal (shown when user clicks Bloquear) */}
+      {showSetPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-card p-6 rounded shadow-lg w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Bloquear simulação</h3>
+            <p className="text-sm text-muted-foreground mb-4">Defina uma senha que será exigida para abrir esta simulação.</p>
+            <Input
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              placeholder="Senha"
+              className="mb-4"
+            />
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => { setShowSetPasswordModal(false); setPasswordInput(''); }}>Cancelar</Button>
+              <Button variant="ghost" size="sm" onClick={handleRemovePassword}>Remover senha</Button>
+              <Button size="sm" onClick={() => handleSetPassword(passwordInput)}>Bloquear</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Spreadsheet container */}
       <div className="flex-1 overflow-auto scrollbar-thin">
