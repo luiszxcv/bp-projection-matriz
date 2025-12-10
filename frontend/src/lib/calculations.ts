@@ -100,6 +100,9 @@ const createEmptyDREData = (month: number): DREData => ({
   salesMetrics: {} as SalesMetrics, // Será calculado depois
   totalMarketingVendas: 0,
   investimentoMarketingAmortizado: 0,
+  investimentoMarketingAplicado: 0,
+  receitaAtivacao: 0,
+  roasAtivacao: 0,
   margemContribuicao: 0,
   percentualMargemContribuicao: 0,
   despesasTimeAdm: 0,
@@ -199,8 +202,14 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
   // Track pending revenue for DFC view
   let pendingDFCRevenue: PendingRevenueTracking[] = [];
   
-  // Legacy base tracking
-  let legacyClients = { ...inputs.legacyBase };
+  // Legacy base tracking — only keep per-tier objects (clients/revenue)
+  let legacyClients = {
+    enterprise: inputs.legacyBase.enterprise,
+    large: inputs.legacyBase.large,
+    medium: inputs.legacyBase.medium,
+    small: inputs.legacyBase.small,
+    tiny: inputs.legacyBase.tiny,
+  };
   // Sales running headcount (contratações persistem entre meses)
   let runningSDR = inputs.dreConfig.currentSDR ?? 1;
   let runningClosers = inputs.dreConfig.currentClosers ?? 2;
@@ -464,6 +473,38 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       }
       pendingSaberConversions[tier] = pendingSaberConversions[tier].filter(c => month - c.month < 2);
     }
+  
+    // APPLY MANUAL EXTRA MONETIZATIONS (Executar No-Loyalty) FOR TIER 'medium'
+    // This allows the user to manually add extra activated clients per month (visible/editable in the UI).
+    const extraExecutarMedium = getMonthlyValue(inputs.dreConfig.extraExecutarNoLoyaltyMedium || 0, idx);
+    if (extraExecutarMedium && extraExecutarMedium > 0) {
+      const tier: Tier = 'medium';
+      const metrics = inputs.tierMetrics[tier];
+      const monthlyTicket = metrics.productTickets.executarNoLoyalty[idx];
+      const duration = inputs.conversionRates.noLoyaltyDuration;
+      const revenue = extraExecutarMedium * monthlyTicket * duration;
+
+      // Add to monthData and aggregates similarly to normal activations
+      monthData.revenueByTierProduct[tier].executarNoLoyalty += revenue;
+      monthData.activeClients[tier].executarNoLoyalty += extraExecutarMedium;
+      monthData.directActivations[tier].executarNoLoyalty += extraExecutarMedium;
+      monthData.activationBreakdown[tier].executarNoLoyalty += 0; // no breakdown applied for manual entries
+      monthData.totalNewRevenue += revenue;
+
+      // DFC tracking
+      pendingDFCRevenue.push({
+        tier,
+        product: 'executarNoLoyalty',
+        source: 'acquisition',
+        monthlyAmount: extraExecutarMedium * monthlyTicket * (metrics.revenueActivationRate ? metrics.revenueActivationRate[idx] : 1),
+        startMonth: month,
+        remainingMonths: duration,
+        totalAmount: revenue,
+      });
+
+      // Coorte ativa para renovações
+      activeExecutarNoLoyalty[tier].push({ clients: extraExecutarMedium, month, renewals: 0 });
+    }
     
     // Process Loyalty renewals (every 7 months, max 2 renewals)
     for (const tier of TIERS) {
@@ -557,12 +598,18 @@ export function calculateMonthlyData(inputs: SimulationInputs): MonthlyData[] {
       // Store revenue before churn
       monthData.legacyRevenueBeforeChurn[tier] = tierLegacy.revenue;
       
-      // Apply churn
-      const remainingClients = Math.round(tierLegacy.clients * (1 - inputs.legacyBase.churnRate));
-      const remainingRevenue = tierLegacy.revenue * (1 - inputs.legacyBase.churnRate);
-      
-      // Apply expansion
-      const expansionRevenue = remainingRevenue * inputs.legacyBase.expansionRate;
+      // Apply churn (monthly value)
+      const churnRateForMonth = Array.isArray(inputs.legacyBase.churnRate)
+        ? inputs.legacyBase.churnRate[idx]
+        : inputs.legacyBase.churnRate;
+      const remainingClients = Math.round(tierLegacy.clients * (1 - churnRateForMonth));
+      const remainingRevenue = tierLegacy.revenue * (1 - churnRateForMonth);
+
+      // Apply expansion (monthly value)
+      const expansionRateForMonth = Array.isArray(inputs.legacyBase.expansionRate)
+        ? inputs.legacyBase.expansionRate[idx]
+        : inputs.legacyBase.expansionRate;
+      const expansionRevenue = remainingRevenue * expansionRateForMonth;
       
       // Distribuir expansão por produtos usando expansionDistribution
       const expDist = tier === 'enterprise' || tier === 'large' 
@@ -1046,7 +1093,6 @@ function calculateDRE(
   salesMetrics.despesaComercialExpansion =
     salesMetrics.remuneracaoFarmer +
     salesMetrics.comissaoFarmerExpansion +
-    salesMetrics.comissaoOperacao +
     salesMetrics.bonusCampanhasExpansion +
     salesMetrics.despesasVisitasExpansion;
 
@@ -1058,6 +1104,15 @@ function calculateDRE(
   dre.salesMetrics = salesMetrics as any;
   // também armazenar em monthData para compatibilidade com UI/export
   monthData.dre.salesMetrics = salesMetrics as any;
+  // Move 'Comissão Operação' into CSP (Custo Serviço Prestado)
+  // Historically this commission was treated as marketing/sales expense; move it to CSP
+  // Add to dre.cspTotal and expose como campo para UI/export
+  (dre as any).cspComissaoOperacao = salesMetrics.comissaoOperacao;
+  dre.cspTotal += salesMetrics.comissaoOperacao;
+  dre.percentualCSP = dre.receitaLiquida > 0 ? dre.cspTotal / dre.receitaLiquida : 0;
+  // Recalculate margem operacional after including this CSP item
+  dre.margemOperacional = dre.receitaLiquida - dre.cspTotal;
+  dre.percentualMargemOperacional = dre.receitaLiquida > 0 ? dre.margemOperacional / dre.receitaLiquida : 0;
   // Total = somente despesas comerciais (Activation + Expansion + Folha Gestão)
   // Sempre incluir investimento no total de Marketing e Vendas.
   // - Se usarLinhasGerenciais: incluir a parcela amortizada (6 meses)
@@ -1065,9 +1120,13 @@ function calculateDRE(
   const amortized = getAmortizedInvestment(inputs.topline.investmentMonthly, idx, 6);
   dre.investimentoMarketingAmortizado = amortized;
   const investimentoAplicado = config.usarLinhasGerenciais ? amortized : (inputs.topline.investmentMonthly[idx] || 0);
-  // guardar para exibição/debug
-  (dre as any).investimentoMarketingAplicado = investimentoAplicado;
+  // guardar valor do investimento aplicado (amortizado quando usar linhas gerenciais)
+  dre.investimentoMarketingAplicado = investimentoAplicado;
   dre.totalMarketingVendas = monthData.dre.salesMetrics.totalDespesasMarketingVendas + investimentoAplicado;
+
+  // Receita utilizada para cálculo de ROAS: usar activationRevenue (já considera DFC quando aplicável)
+  dre.receitaAtivacao = dre.activationRevenue;
+  dre.roasAtivacao = investimentoAplicado > 0 ? dre.receitaAtivacao / investimentoAplicado : 0;
   
   // ========== MARGEM DE CONTRIBUIÇÃO ==========
   dre.margemContribuicao = dre.margemOperacional - dre.totalMarketingVendas;
@@ -1084,15 +1143,78 @@ function calculateDRE(
   dre.despesasSoftwares = config.despesasSoftwares;
   dre.despesasServicosTerceirizados = config.despesasServicosTerceirizados;
   
-  dre.totalDespesasAdm = 
-    dre.despesasTimeAdm + 
-    dre.despesasCustosAdm + 
-    dre.despesasTech + 
-    dre.despesasUtilities + 
-    dre.despesasPessoas + 
-    dre.viagensAdmin + 
-    dre.despesasSoftwares + 
-    dre.despesasServicosTerceirizados;
+  // If a detailed breakdown is provided, use it to compute the total administrative expenses.
+  if (config.despesasAdmDetalhadas) {
+    // Sum all provided detailed items (each may be a number or a monthly array)
+    const det = config.despesasAdmDetalhadas as Record<string, number | number[]>;
+
+    // Compute aggregates from the detailed breakdown to avoid double-counting
+    const timeSum = (getMonthlyValue(det.timePG || 0, idx) || 0) + (getMonthlyValue(det.timeFinanceiro || 0, idx) || 0) + (getMonthlyValue(det.timePP || 0, idx) || 0);
+    const custosSum = getMonthlyValue(det.seguroEmpresa || 0, idx) || 0;
+    const techRem = getMonthlyValue(det.techRemuneracao || 0, idx) || 0;
+    // Compute utilities: prefer an explicit `utilitiesSaoPaulo` value when provided;
+    // otherwise fall back to summing the São Paulo children (aluguelV4House, aluguelPaulista, agua, limpeza, facilites).
+    const utilitiesChildrenSum = (getMonthlyValue(det.aluguelV4House || 0, idx) || 0)
+      + (getMonthlyValue(det.aluguelPaulista || 0, idx) || 0)
+      + (getMonthlyValue(det.aguaPaulista || 0, idx) || 0)
+      + (getMonthlyValue(det.limpezaPaulista || 0, idx) || 0)
+      + (getMonthlyValue(det.facilites || 0, idx) || 0);
+    const utilitiesSaoPauloValue = getMonthlyValue(det.utilitiesSaoPaulo || 0, idx) || utilitiesChildrenSum;
+    // If an explicit `utilitiesSaoPaulo` key is present in the detailed breakdown,
+    // use it alone for the total `despesasUtilities` (avoid double-counting children/offices).
+    // Otherwise, fall back to summing São Paulo children + other office items.
+    const hasUtilitiesSaoPaulo = Object.prototype.hasOwnProperty.call(det, 'utilitiesSaoPaulo');
+    const otherOfficesSum = (getMonthlyValue(det.officeV4Camp || 0, idx) || 0)
+      + (getMonthlyValue(det.aluguelConteiner || 0, idx) || 0)
+      + (getMonthlyValue(det.officeCampinas || 0, idx) || 0)
+      + (getMonthlyValue(det.officePoa || 0, idx) || 0)
+      + (getMonthlyValue(det.officeIndaiatuba || 0, idx) || 0)
+      + (getMonthlyValue(det.flagship || 0, idx) || 0);
+    const utilitiesSum = hasUtilitiesSaoPaulo
+      ? utilitiesSaoPauloValue
+      : utilitiesChildrenSum + otherOfficesSum;
+    // Pessoas: if an explicit `despesasPessoas` monthly series is provided, prefer it
+    const pessoasSum = det.despesasPessoas
+      ? (getMonthlyValue(det.despesasPessoas, idx) || 0)
+      : (getMonthlyValue(det.officePaulistaAjuda || 0, idx) || 0)
+        + (getMonthlyValue(det.campinasAjuda || 0, idx) || 0)
+        + (getMonthlyValue(det.ifood || 0, idx) || 0)
+        + (getMonthlyValue(det.odonto || 0, idx) || 0)
+        + (getMonthlyValue(det.transfer || 0, idx) || 0)
+        + (getMonthlyValue(det.saude || 0, idx) || 0)
+        + (getMonthlyValue(det.socios || 0, idx) || 0)
+        + (getMonthlyValue(det.endomarketing || 0, idx) || 0);
+    const softwaresSum = (getMonthlyValue(det.despesasSoftwaresStackDigital || 0, idx) || 0) + (getMonthlyValue(det.gestao || 0, idx) || 0) + (getMonthlyValue(det.financeiro || 0, idx) || 0) + (getMonthlyValue(det.tech || 0, idx) || 0) + (getMonthlyValue(det.vendas || 0, idx) || 0);
+    const servicosTerSum = (getMonthlyValue(det.servicosContabilidade || 0, idx) || 0) + (getMonthlyValue(det.servicosAuddas || 0, idx) || 0);
+
+    // Note: viagensAdmin is shown separately and intentionally NOT included in the topline total.
+    // Compute viagensSum (may be absent) and the overall detailed sum.
+    const viagensSum = getMonthlyValue(det.viagensAdmin || 0, idx) || 0;
+    const detailedSum = timeSum + custosSum + techRem + utilitiesSum + pessoasSum + softwaresSum + servicosTerSum;
+
+    // Override aggregate fields when detailed components exist
+    dre.despesasTimeAdm = timeSum > 0 ? timeSum : dre.despesasTimeAdm;
+    dre.despesasUtilities = utilitiesSum > 0 ? utilitiesSum : dre.despesasUtilities;
+    dre.despesasSoftwares = softwaresSum > 0 ? softwaresSum : dre.despesasSoftwares;
+    dre.viagensAdmin = viagensSum > 0 ? viagensSum : dre.viagensAdmin;
+    dre.despesasServicosTerceirizados = servicosTerSum > 0 ? servicosTerSum : dre.despesasServicosTerceirizados;
+    dre.despesasCustosAdm = custosSum > 0 ? custosSum : dre.despesasCustosAdm;
+    dre.despesasPessoas = pessoasSum > 0 ? pessoasSum : dre.despesasPessoas;
+    // Tech Remuneração: prefer detailed value if provided (manual override)
+    dre.despesasTech = techRem > 0 ? techRem : dre.despesasTech;
+
+    dre.totalDespesasAdm = detailedSum;
+  } else {
+    dre.totalDespesasAdm = 
+      dre.despesasTimeAdm + 
+      dre.despesasCustosAdm + 
+      dre.despesasTech + 
+      dre.despesasUtilities + 
+      dre.despesasPessoas + 
+      dre.viagensAdmin + 
+      dre.despesasSoftwares + 
+      dre.despesasServicosTerceirizados;
+  }
   
   // ========== EBITDA ==========
   dre.ebitda = dre.margemContribuicao - dre.totalDespesasAdm;

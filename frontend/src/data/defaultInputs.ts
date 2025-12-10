@@ -175,8 +175,8 @@ export const defaultInputs: SimulationInputs = {
     medium: { revenue: 864394.52, clients: 99 },
     small: { revenue: 332742.16, clients: 53 },
     tiny: { revenue: 213587.58, clients: 43 },
-    churnRate: 0.07,
-    expansionRate: 0.04,
+    churnRate: fill12(0.07),
+    expansionRate: fill12(0.04),
   },
   expansionDistribution: {
     largeEnterprise: {
@@ -426,6 +426,71 @@ export const defaultInputs: SimulationInputs = {
     viagensAdmin: 10000,                  // R$ 10.000
     despesasSoftwares: 40000,             // R$ 40.000,00
     despesasServicosTerceirizados: 25246.50, // R$ 25.246,50
+    // Detalhamento das Despesas Administrativas (valores mensais, podem ser número ou array[12])
+    despesasAdmDetalhadas: {
+      // Time Adm
+      timePG: fill12(61500),
+      timeFinanceiro: fill12(65000),
+      timePP: fill12(41330),
+
+      // Custos Adm
+      // Jan-Aug = 5.752,50; Sep-Dec = 0
+      seguroEmpresa: [5752.5, 5752.5, 5752.5, 5752.5, 5752.5, 5752.5, 5752.5, 5752.5, 0, 0, 0, 0],
+
+      // Tech remuneração
+      techRemuneracao: fill12(36960),
+
+      // Utilities (monthly values follow the attached sheet)
+      // Utilities São Paulo: Jan-Apr = 108.475,96 ; May-Dec = 112.975,96
+      utilitiesSaoPaulo: [108475.96,108475.96,108475.96,108475.96,112975.96,112975.96,112975.96,112975.96,112975.96,112975.96,112975.96,112975.96],
+      aluguelV4House: fill12(25500),
+      // Aluguel Paulista: Jan-Apr = 25.000 ; May-Dec = 0
+      aluguelPaulista: [25000,25000,25000,25000,0,0,0,0,0,0,0,0],
+      aguaPaulista: fill12(9350),
+      limpezaPaulista: fill12(6500),
+      facilites: fill12(2300),
+      // Office V4 Camp: Jan-Apr = 33.600 ; May-Dec = 12.600
+      officeV4Camp: [33600,33600,33600,33600,12600,12600,12600,12600,12600,12600,12600,12600],
+      // Office Campinas (separate office): Jan-Apr = 0 ; May-Dec = 40.000
+      officeCampinas: [0,0,0,0,40000,40000,40000,40000,40000,40000,40000,40000],
+      aluguelConteiner: fill12(3725.96),
+      officeIndaiatuba: fill12(0),
+      // Office Poa (not present before) - fill with R$2.500/mês
+      officePoa: fill12(2500),
+      // Flagship: Jan-Apr = 0 ; May-Dec = 10.500
+      flagship: [0,0,0,0,10500,10500,10500,10500,10500,10500,10500,10500],
+
+      // Despesas Pessoas
+      officePaulistaAjuda: fill12(34205),
+      // V4 Camp Ajuda de Custo (new key) - default 0
+      officeV4CampAjuda: fill12(0),
+      // Flagship Ajuda de Custo (new key) - default 0
+      flagshipAjuda: fill12(0),
+      // Campinas Ajuda: Jan = 0 ; Feb = 34.300 ; Mar-Dec = 21.630
+      campinasAjuda: [0,34300,21630,21630,21630,21630,21630,21630,21630,21630,21630,21630],
+      ifood: fill12(1950),
+      odonto: fill12(3950),
+      transfer: fill12(0),
+      saude: fill12(0),
+      socios: fill12(2692),
+      // Explicit monthly override for Despesas Pessoas (user-provided series)
+      despesasPessoas: [49797,72288.43,72288.43,72288.43,81383.43,67326.29,67326.29,67326.29,67326.29,67326.29,67326.29,67326.29],
+
+      // Outros
+      endomarketing: fill12(7000),
+      viagensAdmin: fill12(10000),
+      despesasSoftwaresStackDigital: fill12(18500),
+
+      // Gestão / apoio
+      gestao: fill12(6937.58),
+      financeiro: fill12(1968.56),
+      tech: fill12(12793.75),
+      vendas: fill12(2028.45),
+
+      // Serviços terceirizados
+      servicosContabilidade: fill12(18800),
+      servicosAuddas: fill12(8446.5),
+    },
     
     // Financeiro
     despesasFinanceirasRate: 0.019,       // 1.9% sobre Receita Bruta Recebida
@@ -438,6 +503,11 @@ export const defaultInputs: SimulationInputs = {
     pagamentoFinanciamento: 11388.93,     // R$ 11.388,93/mês
     distribuicaoDividendos: 150000,       // R$ 150.000/mês
     caixaInicial: 1500000,                // R$ 1.500.000 (capital inicial)
+    // Manual override: extra ativações Executar No-Loyalty para Tier `medium`
+    // Usuário pode editar mês a mês na planilha (linha visível). Padrão = 0
+    extraExecutarNoLoyaltyMedium: fill12(0),
+    // Receita ano anterior (valor anual em R$) — editável no cabeçalho
+    previousYearRevenue: 34000000,
   },
 };
 

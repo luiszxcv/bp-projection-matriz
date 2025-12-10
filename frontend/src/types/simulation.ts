@@ -64,8 +64,9 @@ export interface LegacyBase {
   medium: { revenue: number; clients: number };
   small: { revenue: number; clients: number };
   tiny: { revenue: number; clients: number };
-  churnRate: number;
-  expansionRate: number;
+  // Monthly rates (12 values) to allow per-month adjustments
+  churnRate: number[];
+  expansionRate: number[];
 }
 
 export interface ExpansionDistribution {
@@ -266,6 +267,59 @@ export interface DREConfig {
   viagensAdmin: number;              // Default: R$ 10.000
   despesasSoftwares: number;         // Default: R$ 21.672,26
   despesasServicosTerceirizados: number; // Default: R$ 25.246,50
+
+  // Detalhamento opcional das Despesas Administrativas (se presente, será usado para compor os totais)
+  despesasAdmDetalhadas?: {
+    // Time Adm
+    timePG?: number | number[];
+    timeFinanceiro?: number | number[];
+    timePP?: number | number[];
+
+    // Custos Adm
+    seguroEmpresa?: number | number[];
+
+    // Tech remuneração
+    techRemuneracao?: number | number[];
+
+    // Utilities
+    utilitiesSaoPaulo?: number | number[];
+    aluguelV4House?: number | number[];
+    aluguelPaulista?: number | number[];
+    aguaPaulista?: number | number[];
+    limpezaPaulista?: number | number[];
+    facilites?: number | number[];
+    officeCampinas?: number | number[];
+    officeV4Camp?: number | number[];
+    officePoa?: number | number[];
+    aluguelConteiner?: number | number[];
+    officeIndaiatuba?: number | number[];
+    flagship?: number | number[];
+
+    // Despesas Pessoas
+    officePaulistaAjuda?: number | number[];
+    campinasAjuda?: number | number[];
+    officeV4CampAjuda?: number | number[];
+    flagshipAjuda?: number | number[];
+    despesasPessoas?: number | number[];
+    ifood?: number | number[];
+    odonto?: number | number[];
+    transfer?: number | number[];
+    saude?: number | number[];
+    socios?: number | number[];
+
+    // Outros
+    endomarketing?: number | number[];
+    viagensAdmin?: number | number[];
+    despesasSoftwaresStackDigital?: number | number[];
+    gestao?: number | number[];
+    financeiro?: number | number[];
+    tech?: number | number[];
+    vendas?: number | number[];
+
+    // Serviços terceirizados
+    servicosContabilidade?: number | number[];
+    servicosAuddas?: number | number[];
+  };
   
   // Financeiro
   despesasFinanceirasRate: number;  // Default: 1.9% sobre Receita Bruta Recebida
@@ -278,6 +332,11 @@ export interface DREConfig {
   pagamentoFinanciamento: number;    // Default: R$ 11.388,93/mês
   distribuicaoDividendos: number;    // Default: R$ 150.000/mês
   caixaInicial: number;              // Default: R$ 1.500.000
+    // Manual overrides: extra ativações Executar No-Loyalty para Tier `medium` (por mês)
+    // Pode ser um único número (aplicado a todos os meses) ou um array de 12 números
+    extraExecutarNoLoyaltyMedium?: number | number[];
+  // Receita ano anterior (valor anual em R$) — editável no cabeçalho
+  previousYearRevenue?: number;
 }
 
 // Sales & Marketing Configuration
@@ -365,6 +424,11 @@ export interface DREData {
   totalMarketingVendas: number;
   // Quando usar linhas gerenciais, valor do investimento de marketing amortizado (6 meses)
   investimentoMarketingAmortizado?: number;
+  // Valor efetivamente aplicado do investimento de marketing neste mês (amortizado quando usar linhas gerenciais)
+  investimentoMarketingAplicado?: number;
+  // Receita usada para calcular ROAS (receita de ativações / investimento)
+  receitaAtivacao?: number;
+  roasAtivacao?: number;
   
   // MARGEM DE CONTRIBUIÇÃO
   margemContribuicao: number;
