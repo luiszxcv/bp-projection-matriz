@@ -4394,6 +4394,22 @@ const { inputs, monthlyData } = simulation;
               </div>
 
               <div className="flex row-hover">
+                <RowHeader label="$ Total de Receita" className="pl-6" tooltip="Soma visual: Ativação + Expansão + Legacy (apenas visual, não altera cálculos)" />
+                {monthlyData.map((m, i) => (
+                  <SpreadsheetCell
+                    key={i}
+                    value={((m.dre.activationRevenue || 0) + (m.dre.expansionRevenue || 0) + (m.dre.legacyRevenue || 0))}
+                    format="currency"
+                  />
+                ))}
+                <SpreadsheetCell
+                  value={monthlyData.reduce((sum, m) => sum + ((m.dre.activationRevenue || 0) + (m.dre.expansionRevenue || 0) + (m.dre.legacyRevenue || 0)), 0)}
+                  format="currency"
+                  className="bg-primary/10"
+                />
+              </div>
+
+              <div className="flex row-hover">
                 <RowHeader label="Activation" className="pl-6" tooltip="Receita de novos clientes ativados" />
                 {monthlyData.map((m, i) => (
                   <SpreadsheetCell key={i} value={m.dre.activationRevenue} format="currency" />
