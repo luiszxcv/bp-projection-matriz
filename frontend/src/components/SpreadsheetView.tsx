@@ -650,7 +650,7 @@ const { inputs, monthlyData } = simulation;
     addRow('# Contratações Executar', monthlyData.map(m => m.capacityPlan.hiresExecutar));
     addRow('# Total Contratações', monthlyData.map(m => m.capacityPlan.totalHires));
     addRow('# GAP Reapropriação Executar→Saber', monthlyData.map(m => m.capacityPlan.redeployableFromExecutar));
-    addRow('# Total Contratações (com realocação)', monthlyData.map(m => m.capacityPlan.totalHiresWithRedeployment));
+    // '# Total Contratações (com realocação)' será renderizado depois das linhas de Sales
     addRow('$ Receita/HC', monthlyData.map(m => m.capacityPlan.revenuePerHC));
     // Sales guidance (SDR / Closers) - não contam no totalHC
     addRow('# Sales: SDR Required', monthlyData.map(m => m.capacityPlan.salesSDRRequired ?? 0));
@@ -658,6 +658,9 @@ const { inputs, monthlyData } = simulation;
     addRow('# Sales: Current SDR', monthlyData.map(m => m.capacityPlan.salesCurrentSDR ?? 0));
     addRow('# Sales: Current Closers', monthlyData.map(m => m.capacityPlan.salesCurrentClosers ?? 0));
     addRow('# Contratações Sales', monthlyData.map(m => m.capacityPlan.salesHires ?? 0));
+
+    // '# Total Contratações (com realocação)' movido para após Sales e somando hires de Sales
+    addRow('# Total Contratações (com realocação)', monthlyData.map(m => (m.capacityPlan.totalHiresWithRedeployment || 0) + (m.capacityPlan.salesHires || 0)));
 
     // Create workbook and worksheet
     const ws = XLSX.utils.aoa_to_sheet(data);
@@ -3324,17 +3327,7 @@ const { inputs, monthlyData } = simulation;
             />
           </div>
 
-          <div className="flex row-hover bg-green-500/10">
-            <RowHeader label="# TOTAL CONTRATAÇÕES (com realocação)" className="pl-6 font-bold text-green-500" />
-            {monthlyData.map((m, i) => (
-              <SpreadsheetCell key={i} value={m.capacityPlan.totalHiresWithRedeployment} format="number" className="font-bold text-green-500" />
-            ))}
-            <SpreadsheetCell
-              value={monthlyData.reduce((sum, m) => sum + m.capacityPlan.totalHiresWithRedeployment, 0)}
-              format="number"
-              className="bg-green-500/20 font-bold text-green-500"
-            />
-          </div>
+          {/* '# TOTAL CONTRATAÇÕES (com realocação)' movido para abaixo das linhas de Sales e somará Sales hires */}
 
           {/* Sales guidance (SDR / Closers) - não contam no totalHC */}
           <div className="flex row-hover">
@@ -3394,6 +3387,18 @@ const { inputs, monthlyData } = simulation;
               value={monthlyData.reduce((sum, m) => sum + (m.capacityPlan.salesHires ?? 0), 0)}
               format="number"
               className="spreadsheet-total"
+            />
+          </div>
+
+          <div className="flex row-hover bg-green-500/10">
+            <RowHeader label="# TOTAL CONTRATAÇÕES (com realocação)" className="pl-6 font-bold text-green-500" />
+            {monthlyData.map((m, i) => (
+              <SpreadsheetCell key={i} value={(m.capacityPlan.totalHiresWithRedeployment || 0) + (m.capacityPlan.salesHires || 0)} format="number" className="font-bold text-green-500" />
+            ))}
+            <SpreadsheetCell
+              value={monthlyData.reduce((sum, m) => sum + ((m.capacityPlan.totalHiresWithRedeployment || 0) + (m.capacityPlan.salesHires || 0)), 0)}
+              format="number"
+              className="bg-green-500/20 font-bold text-green-500"
             />
           </div>
 
