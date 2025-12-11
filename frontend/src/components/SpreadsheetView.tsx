@@ -126,23 +126,43 @@ const { inputs, monthlyData } = simulation;
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   };
 
-  // Track last seen password hash to avoid resetting authentication on unrelated updates
+  // Track last seen password hash and last seen simulation id to avoid
+  // resetting authentication on unrelated updates, but require the
+  // password whenever the user switches to a different simulation that
+  // has a password configured.
   const [lastPasswordHash, setLastPasswordHash] = useState<string | undefined>(undefined);
+  const [lastSimId, setLastSimId] = useState<string | undefined>(undefined);
+
   useEffect(() => {
     try {
       const pwHash = (simulation.inputs as any)?.protection?.passwordHash;
+
+      // If no password on this simulation, ensure unlocked and clear trackers
       if (!pwHash) {
         setIsAuthenticated(true);
         setLastPasswordHash(undefined);
-      } else if (lastPasswordHash !== pwHash) {
+        setLastSimId(simulation.id);
+        return;
+      }
+
+      // If switched simulation (different id), require password regardless
+      if (simulation.id !== lastSimId) {
+        setIsAuthenticated(false);
+        setLastPasswordHash(pwHash);
+        setLastSimId(simulation.id);
+        return;
+      }
+
+      // If same simulation but hash changed, require password
+      if (lastPasswordHash !== pwHash) {
         setIsAuthenticated(false);
         setLastPasswordHash(pwHash);
       }
-      // If hash unchanged, keep current isAuthenticated
+      // Otherwise keep current isAuthenticated
     } catch (e) {
       // ignore
     }
-  }, [simulation, lastPasswordHash]);
+  }, [simulation, lastPasswordHash, lastSimId]);
 
   const handleUnlock = async () => {
     try {
