@@ -126,16 +126,23 @@ const { inputs, monthlyData } = simulation;
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   };
 
+  // Track last seen password hash to avoid resetting authentication on unrelated updates
+  const [lastPasswordHash, setLastPasswordHash] = useState<string | undefined>(undefined);
   useEffect(() => {
     try {
-      // If simulation.inputs.protection?.passwordHash exists, require password; else unlocked
       const pwHash = (simulation.inputs as any)?.protection?.passwordHash;
-      if (!pwHash) setIsAuthenticated(true);
-      else setIsAuthenticated(false);
+      if (!pwHash) {
+        setIsAuthenticated(true);
+        setLastPasswordHash(undefined);
+      } else if (lastPasswordHash !== pwHash) {
+        setIsAuthenticated(false);
+        setLastPasswordHash(pwHash);
+      }
+      // If hash unchanged, keep current isAuthenticated
     } catch (e) {
       // ignore
     }
-  }, [simulation]);
+  }, [simulation, lastPasswordHash]);
 
   const handleUnlock = async () => {
     try {
