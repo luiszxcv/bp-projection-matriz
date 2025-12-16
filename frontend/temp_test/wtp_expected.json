@@ -1,0 +1,18 @@
+{
+  "Jan": {
+    "enterprise": 1455264,
+    "large": 3080160,
+    "medium": 5636730,
+    "small": 4330545,
+    "tiny": 1506600,
+    "total": 16009299
+  },
+  "Fev": {
+    "enterprise": 1455264,
+    "large": 2883000,
+    "medium": 5521410,
+    "small": 4226850,
+    "tiny": 1468238,
+    "total": 15554762
+  }
+}

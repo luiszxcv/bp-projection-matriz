@@ -15,49 +15,51 @@ const fillProductMonthly = (vals: { saber: number; ter: number; executarNoLoyalt
 const defaultTierMetrics: Record<Tier, TierMetrics> = {
   enterprise: {
     mqlDistribution: fill12(0.0460),
-    mqlToSqlRate: fill12(0.25),
+    mqlToSqlRate: fill12(0.20),
     sqlToSalRate: fill12(0.86),
-    salToWonRate: fill12(0.25),
-    activationRate: fill12(0.93),
+    salToWonRate: fill12(0.30),
+    activationRate: fill12(0.88),
     revenueActivationRate: fill12(0.93),
     productDistribution: fillProductMonthly({
-      saber: 0.30,
-      ter: 0.20,
-      executarNoLoyalty: 0.20,
+      saber: 0.60,
+      ter: 0.10,
+      executarNoLoyalty: 0.00,
       executarLoyalty: 0.20,
       potencializar: 0.10,
     }),
     productTickets: {
-      saber: fill12(50000),
+      // Enterprise Saber: Q1=30k, Q2=50k, Q3=100k, Q4=150k
+      saber: [30000, 30000, 30000, 50000, 50000, 50000, 100000, 100000, 100000, 150000, 150000, 150000],
       ter: fill12(31600),
-      // Enterprise Executar No Loyalty (ticket MENSAL): Q1=15k, Q2=20k, Q3=30k, Q4=35k
-      executarNoLoyalty: [15000, 15000, 15000, 20000, 20000, 20000, 30000, 30000, 30000, 35000, 35000, 35000],
-      // Enterprise Executar Loyalty (ticket MENSAL): Q1=15k, Q2=20k, Q3=30k, Q4=35k
-      executarLoyalty: [15000, 15000, 15000, 20000, 20000, 20000, 30000, 30000, 30000, 35000, 35000, 35000],
+      // Enterprise Executar No Loyalty: 0 (não vendem mais direto)
+      executarNoLoyalty: fill12(0),
+      // Enterprise Executar Loyalty: R$ 145k (valor anualizado do contrato)
+      executarLoyalty: fill12(145000),
       potencializar: fill12(0),
     },
   },
   large: {
     mqlDistribution: fill12(0.0511),
-    mqlToSqlRate: fill12(0.30),
+    mqlToSqlRate: fill12(0.25),
     sqlToSalRate: fill12(0.86),
-    salToWonRate: fill12(0.25),
-    activationRate: fill12(0.93),
+    salToWonRate: fill12(0.30),
+    activationRate: fill12(0.84),
     revenueActivationRate: fill12(0.93),
     productDistribution: fillProductMonthly({
-      saber: 0.30,
-      ter: 0.00,
-      executarNoLoyalty: 0.30,
-      executarLoyalty: 0.30,
+      saber: 0.60,
+      ter: 0.10,
+      executarNoLoyalty: 0.00,
+      executarLoyalty: 0.20,
       potencializar: 0.10,
     }),
     productTickets: {
       // Large Saber: Q1=25k, Q2=40k, Q3=80k, Q4=120k
       saber: [25000, 25000, 25000, 40000, 40000, 40000, 80000, 80000, 80000, 120000, 120000, 120000],
       ter: fill12(18000),
-      // Large Executar (ticket MENSAL): Q1=11k, Q2=15k, Q3=20k, Q4=20k
-      executarNoLoyalty: [11000, 11000, 11000, 15000, 15000, 15000, 20000, 20000, 20000, 20000, 20000, 20000],
-      executarLoyalty: [11000, 11000, 11000, 15000, 15000, 15000, 20000, 20000, 20000, 20000, 20000, 20000],
+      // Large Executar No Loyalty: 0 (não vendem mais direto)
+      executarNoLoyalty: fill12(0),
+      // Large Executar Loyalty: R$ 99k
+      executarLoyalty: fill12(99000),
       potencializar: fill12(0),
     },
   },
@@ -71,48 +73,24 @@ const defaultTierMetrics: Record<Tier, TierMetrics> = {
     productDistribution: fillProductMonthly({
       saber: 0.60,
       ter: 0.10,
-      executarNoLoyalty: 0.15,
-      executarLoyalty: 0.15,
+      executarNoLoyalty: 0.00,
+      executarLoyalty: 0.30,
       potencializar: 0.00,
     }),
     productTickets: {
       // Medium Saber: Q1=20k, Q2=40k, Q3=80k, Q4=100k
       saber: [20000, 20000, 20000, 40000, 40000, 40000, 80000, 80000, 80000, 100000, 100000, 100000],
       ter: fill12(15000),
-      // Medium Executar (ticket MENSAL): Q1=7k, Q2=8k, Q3=9k, Q4=10k
-      executarNoLoyalty: [7000, 7000, 7000, 8000, 8000, 8000, 9000, 9000, 9000, 10000, 10000, 10000],
-      executarLoyalty: [7000, 7000, 7000, 8000, 8000, 8000, 9000, 9000, 9000, 10000, 10000, 10000],
+      // Medium Executar No Loyalty: 0
+      executarNoLoyalty: fill12(0),
+      // Medium Executar Loyalty: R$ 49k
+      executarLoyalty: fill12(49000),
       potencializar: fill12(0),
     },
   },
   small: {
     mqlDistribution: fill12(0.4760),
-    mqlToSqlRate: fill12(0.35),
-    sqlToSalRate: fill12(0.86),
-    salToWonRate: fill12(0.30),
-    activationRate: fill12(0.93),
-    revenueActivationRate: fill12(0.93),
-    productDistribution: {
-      // Small: Saber + Ter nos 12 meses; Executar só Jan-Jun (aquisição direta)
-      saber: [0.80, 0.80, 0.80, 0.80, 0.80, 0.80, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00],
-      ter: [0.20, 0.20, 0.20, 0.20, 0.20, 0.20, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00],
-      executarNoLoyalty: fill12(0.00),
-      executarLoyalty: fill12(0.00),
-      potencializar: fill12(0.00),
-    },
-    productTickets: {
-      // Small Saber: Q1=20k, Q2=30k, Q3=30k, Q4=40k
-      saber: [20000, 20000, 20000, 30000, 30000, 30000, 30000, 30000, 30000, 40000, 40000, 40000],
-      ter: fill12(11500),
-      // Small Executar (ticket MENSAL): R$7k o ano todo (conversões Saber→Executar)
-      executarNoLoyalty: fill12(7000),
-      executarLoyalty: fill12(7000),
-      potencializar: fill12(0),
-    },
-  },
-  tiny: {
-    mqlDistribution: fill12(0.2246),
-    mqlToSqlRate: fill12(0.35),
+    mqlToSqlRate: fill12(0.30),
     sqlToSalRate: fill12(0.86),
     salToWonRate: fill12(0.30),
     activationRate: fill12(0.93),
@@ -125,10 +103,32 @@ const defaultTierMetrics: Record<Tier, TierMetrics> = {
       potencializar: 0.00,
     }),
     productTickets: {
-      // Tiny Saber: Q1=13k, Q2=15k, Q3=20k, Q4=30k
-      saber: [13000, 13000, 13000, 15000, 15000, 15000, 20000, 20000, 20000, 30000, 30000, 30000],
+      // Small Saber: Q1=20k, Q2=30k, Q3=40k, Q4=50k
+      saber: [20000, 20000, 20000, 30000, 30000, 30000, 40000, 40000, 40000, 50000, 50000, 50000],
+      ter: fill12(11500),
+      executarNoLoyalty: fill12(0),
+      executarLoyalty: fill12(0),
+      potencializar: fill12(0),
+    },
+  },
+  tiny: {
+    mqlDistribution: fill12(0.2246),
+    mqlToSqlRate: fill12(0.30),
+    sqlToSalRate: fill12(0.86),
+    salToWonRate: fill12(0.30),
+    activationRate: fill12(0.93),
+    revenueActivationRate: fill12(0.93),
+    productDistribution: fillProductMonthly({
+      saber: 0.80,
+      ter: 0.20,
+      executarNoLoyalty: 0.00,
+      executarLoyalty: 0.00,
+      potencializar: 0.00,
+    }),
+    productTickets: {
+      // Tiny Saber: Q1=15k, Q2=20k, Q3=30k, Q4=40k
+      saber: [15000, 15000, 15000, 20000, 20000, 20000, 30000, 30000, 30000, 40000, 40000, 40000],
       ter: fill12(7500),
-      // Tiny Executar (ticket MENSAL): sempre 0
       executarNoLoyalty: fill12(0),
       executarLoyalty: fill12(0),
       potencializar: fill12(0),
@@ -139,34 +139,42 @@ const defaultTierMetrics: Record<Tier, TierMetrics> = {
 export const defaultInputs: SimulationInputs = {
   name: 'Nova Simulação',
   topline: {
+    // Budget mensal de mídia (valores do BP 2026)
     investmentMonthly: [
-      400000,
-      600000,
-      900000,
-      1000000,
-      1000000,
-      1100000,
-      1000000,
-      1000000,
-      1000000,
-      900000,
-      800000,
-      600000,
+      4838976,   // Jan
+      4838976,   // Fev
+      5080925,   // Mar
+      5589017,   // Abr
+      6147919,   // Mai
+      6455315,   // Jun
+      6778081,   // Jul
+      6778081,   // Ago
+      6778081,   // Set
+      6100273,   // Out
+      5422464,   // Nov
+      4744656,   // Dez
     ],
-    cplMonthly: fill12(900),
+    // CPL mensal (valores crescentes ao longo do ano)
+    cplMonthly: [350, 359, 368, 386, 405, 426, 436, 436, 436, 445, 454, 463],
+    // Taxa Lead → MQL (nova etapa do funnel)
+    leadToMqlRate: fill12(0.80),
+
   },
   tierMetrics: defaultTierMetrics,
   conversionRates: {
-    saberToExecutar: 0.40,
-    executarLoyaltyRatio: 0.40,
     saberConversionDays: 60,
-    loyaltyDuration: 7,
+    loyaltyDuration: {
+      enterprise: 10,
+      large: 10,
+      medium: 7,
+      small: 7,
+      tiny: 7,
+    },
     loyaltyRenewalRate: 0.20,
     loyaltyMaxRenewals: 2,
     noLoyaltyDuration: 2,
     noLoyaltyRenewalRate: 0.85,
     noLoyaltyMaxRenewals: 4,
-    expansionRate: 0.04,
   },
   legacyBase: {
     // Ajuste para que a Receita Base Legada mensal totalize aproximadamente R$ 2.100.000
@@ -182,15 +190,15 @@ export const defaultInputs: SimulationInputs = {
     largeEnterprise: {
       saber: 0.05,
       ter: 0.25,
-      executarNoLoyalty: 0.70,
-      executarLoyalty: 0.00,
+      executarNoLoyalty: 0.00,
+      executarLoyalty: 0.70,
       potencializar: 0.00,
     },
     medium: {
       saber: 0.05,
       ter: 0.40,
-      executarNoLoyalty: 0.55,
-      executarLoyalty: 0.00,
+      executarNoLoyalty: 0.00,
+      executarLoyalty: 0.55,
       potencializar: 0.00,
     },
     smallTiny: {
@@ -325,19 +333,19 @@ export const defaultInputs: SimulationInputs = {
     // Comissões (%)
     comissaoActivationRate: 0.05,         // 5%
     comissaoExpansionRate: 0.05,          // 5%
-    
+
     // Remuneração Closers
     closerProductivity: 10,               // 10 WONs/mês/closer
     closerSalary: 5000,                   // R$ 5.000/mês
-    
+
     // Remuneração SDRs
     sdrProductivity: 80,                  // 80 SQLs/mês/SDR
     sdrSalary: 3250,                      // R$ 3.250/mês
-    
+
     // Remuneração Farmers
     farmerProductivity: 150,              // 150 clientes/farmer
     farmerSalary: 7000,                   // R$ 7.000/mês
-    
+
     // Despesas Fixas Mensais
     folhaGestaoComercial: 32500,          // R$ 32.500/mês
     bonusCampanhasActivation: 8000,       // R$ 8.000/mês
@@ -347,167 +355,112 @@ export const defaultInputs: SimulationInputs = {
     // Comissão Monetização Ops: percentual sobre expansão (inicial igual a comissaoExpansionRate)
     comissaoMonetizacaoOpsRate: 0.05,
     despesasVisitasExpansion: 2000,       // R$ 2.000/mês
+    currentSDR: 1,
+    currentClosers: 2,
+    outboundSalRate: 0.074,
   },
-  dreConfig: {
-    // Controle de visualização
-    usarLinhasGerenciais: false,           // true = mostra e calcula linhas gerenciais (inadimplência, churns, etc)
-    
-    // Percentuais de dedução sobre Revenue
-    inadimplenciaRate: 0.04,              // 4%
-    churnM0FalconsRate: 0.00,             // 0% (quebra aplicada no funil)
-    churnRecebimentoOPSRate: 0.02,        // 2%
-    // Devoluções Saber: percentual aplicado sobre a receita de aquisição do produto Saber
-    devolucoesSaberRate: 0.05,           // 5%
-    
-    // Tributos sobre Receita Bruta Recebida
-    royaltiesRate: 0.15,                  // 15%
-    issRate: 0.02,                        // 2%
-    irrfRate: 0.015,                      // 1.5%
-    pisRate: 0.0165,                      // 1.65%
-    cofinsRate: 0.0365,                   // 3.65%
-    
-    // CSP (Custo de Serviço Prestado) - Modelo baseado em Squad e Capacidade
-    // SQUAD EXECUTAR (9 pessoas, atende 20 clientes)
-    // Observação: valores ajustados com rampa trimestral crescente.
-    // Rampa: Q1=80% (início), Q2≈86.67%, Q3≈93.33%, Q4=100% (meta Dez/2025).
-    // Esses são valores padrão editáveis — as fórmulas não foram alteradas.
-    cspExecutarSquadMensal: 73000,        // R$ 73.000/squad/mês
-    cspExecutarCapacidadeClientes: 20,    // 20 clientes/squad
-    // Rampa: Q1 values adjusted to match provided spreadsheet (Jan/Feb/Mar)
-    // Q1 and Q4 preserved; Q2/Q3 smoothed (linear 1/3 and 2/3 interpolation)
-    cspExecutarCoordenador: [9000, 9000, 9000, 10667, 10667, 10667, 12333, 12333, 12333, 14000, 14000, 14000],
-    cspExecutarAccountSr: [5000, 5000, 5000, 5500, 5500, 5500, 6000, 6000, 6000, 6500, 6500, 6500],
-    cspExecutarGestorTrafegoSr: [5000, 5000, 5000, 5500, 5500, 5500, 6000, 6000, 6000, 6500, 6500, 6500],
-    cspExecutarGestorTrafegoPl: [5000, 5000, 5000, 5500, 5500, 5500, 6000, 6000, 6000, 6500, 6500, 6500],
-    cspExecutarCopywriter: [5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000],
-    cspExecutarDesignerSr: [4600, 4600, 4600, 5067, 5067, 5067, 5533, 5533, 5533, 6000, 6000, 6000],
-    cspExecutarDesignerPl: [3600, 3600, 3600, 3900, 3900, 3900, 4200, 4200, 4200, 4500, 4500, 4500],
-    cspExecutarSocialMedia: [4000, 4000, 4000, 4333, 4333, 4333, 4667, 4667, 4667, 5000, 5000, 5000],
-    
-    // SQUAD SABER (9 pessoas, atende 15 clientes)
-    // Observação: valores ajustados com rampa trimestral crescente.
-    // Rampa: Q1=80% (início), Q2≈86.67%, Q3≈93.33%, Q4=100% (meta Dez/2025).
-    // Esses são valores padrão editáveis — as fórmulas não foram alteradas.
-    cspSaberSquadMensal: 80238,           // R$ 80.238/squad/mês
-    cspSaberCapacidadeClientes: 15,       // 15 clientes/squad
-    // Rampa: Q1 values adjusted to match provided spreadsheet (Jan/Feb/Mar)
-    cspSaberCoordenador: [9000, 9000, 9000, 12667, 12667, 12667, 16333, 16333, 16333, 20000, 20000, 20000],
-    cspSaberAccountSr: [5000, 5000, 5000, 7500, 7500, 7500, 10000, 10000, 10000, 12500, 12500, 12500],
-    cspSaberAccountJr: [4000, 4000, 4000, 4333, 4333, 4333, 4667, 4667, 4667, 5000, 5000, 5000],
-    cspSaberGestorTrafegoPl: [5000, 5000, 5000, 6667, 6667, 6667, 8333, 8333, 8333, 10000, 10000, 10000],
-    cspSaberCopywriter: [5000, 5000, 5000, 6000, 6000, 6000, 7000, 7000, 7000, 8000, 8000, 8000],
-    cspSaberDesignerSr: [4600, 4600, 4600, 5733, 5733, 5733, 6867, 6867, 6867, 8000, 8000, 8000],
-    cspSaberTech: [2200, 2200, 2200, 2380, 2380, 2380, 2560, 2560, 2560, 2738, 2738, 2738],
-    cspSaberAccountPl: [5000, 5000, 5000, 6000, 6000, 6000, 7000, 7000, 7000, 8000, 8000, 8000],
-    cspSaberSalesEnablement: [4800, 4800, 4800, 5200, 5200, 5200, 5600, 5600, 5600, 6000, 6000, 6000],
-    
-    // Outros CSP
-    cspCssWebProducts: 23000,             // Fixo em R$ 23k/mês
-    // Rampa: Q1=60k, Q2=70k, Q3=80k, Q4=90k
-    cspGerentes: [60000, 60000, 60000, 60000, 60000, 60000, 60000, 60000, 60000, 60000, 60000, 60000],
-    
-    // TER usa estrutura similar ao Saber
-    cspTerUsaSaberSquad: true,            // Ter usa a mesma estrutura de squad Saber
-    
-    // Despesas Marketing e Vendas
-    folhaGestaoComercial: 32500,          // R$ 32.500/mês
-    comissaoMediaPorCliente: 2500,        // R$ 2.500/cliente (média ponderada)
-    salarioCloser: 5000,                  // R$ 5.000/closer
-    salarioSDR: 3500,                     // R$ 3.500/SDR
-    despesasVisitas: 2000,                // R$ 2.000/mês
-    
-    // Despesas Administrativas (valores fixos mensais)
-    despesasTimeAdm: 174400,              // R$ 174.400
-    despesasCustosAdm: 9905,              // R$ 9.905
-    despesasTech: 36200,                  // R$ 36.200
-    despesasUtilities: 123350,            // R$ 123.350
-    despesasPessoasInicial: 73500,        // R$ 73.500 (mês 1)
-    despesasPessoasIncremento: 1750,      // R$ 1.750/mês (incremento mensal)
-    viagensAdmin: 10000,                  // R$ 10.000
-    despesasSoftwares: 40000,             // R$ 40.000,00
-    despesasServicosTerceirizados: 25246.50, // R$ 25.246,50
-    // Detalhamento das Despesas Administrativas (valores mensais, podem ser número ou array[12])
-    despesasAdmDetalhadas: {
-      // Time Adm
-      timePG: fill12(61500),
-      timeFinanceiro: fill12(65000),
-      timePP: fill12(41330),
-
-      // Custos Adm
-      // Jan-Aug = 5.752,50; Sep-Dec = 0
-      seguroEmpresa: [5752.5, 5752.5, 5752.5, 5752.5, 5752.5, 5752.5, 5752.5, 5752.5, 0, 0, 0, 0],
-
-      // Tech remuneração
-      techRemuneracao: fill12(36960),
-
-      // Utilities (monthly values follow the attached sheet)
-      // Utilities São Paulo: Jan-Apr = 108.475,96 ; May-Dec = 112.975,96
-      utilitiesSaoPaulo: [108475.96,108475.96,108475.96,108475.96,112975.96,112975.96,112975.96,112975.96,112975.96,112975.96,112975.96,112975.96],
-      aluguelV4House: fill12(25500),
-      // Aluguel Paulista: Jan-Apr = 25.000 ; May-Dec = 0
-      aluguelPaulista: [25000,25000,25000,25000,0,0,0,0,0,0,0,0],
-      aguaPaulista: fill12(9350),
-      limpezaPaulista: fill12(6500),
-      facilites: fill12(2300),
-      // Office V4 Camp: Jan-Apr = 33.600 ; May-Dec = 12.600
-      officeV4Camp: [33600,33600,33600,33600,12600,12600,12600,12600,12600,12600,12600,12600],
-      // Office Campinas (separate office): Jan-Apr = 0 ; May-Dec = 40.000
-      officeCampinas: [0,0,0,0,40000,40000,40000,40000,40000,40000,40000,40000],
-      aluguelConteiner: fill12(3725.96),
-      officeIndaiatuba: fill12(0),
-      // Office Poa (not present before) - fill with R$2.500/mês
-      officePoa: fill12(2500),
-      // Flagship: Jan-Apr = 0 ; May-Dec = 10.500
-      flagship: [0,0,0,0,10500,10500,10500,10500,10500,10500,10500,10500],
-
-      // Despesas Pessoas
-      officePaulistaAjuda: fill12(34205),
-      // V4 Camp Ajuda de Custo (new key) - default 0
-      officeV4CampAjuda: fill12(0),
-      // Flagship Ajuda de Custo: Jan-Apr = 0, May-Dec = 10.500
-      flagshipAjuda: [0,0,0,0,10500,10500,10500,10500,10500,10500,10500,10500],
-      // Campinas Ajuda de Custo: Jan-Apr = 0, May-Dec = 32.800
-      campinasAjuda: [0,0,0,0,32800,32800,32800,32800,32800,32800,32800,32800],
-      ifood: fill12(1950),
-      odonto: fill12(3950),
-      transfer: fill12(0),
-      saude: fill12(0),
-      socios: fill12(2692),
-      // Explicit monthly override for Despesas Pessoas (user-provided series)
-      despesasPessoas: [49797,72288.43,72288.43,72288.43,81383.43,67326.29,67326.29,67326.29,67326.29,67326.29,67326.29,67326.29],
-
-      // Outros
-      endomarketing: fill12(7000),
-      viagensAdmin: fill12(10000),
-      despesasSoftwaresStackDigital: fill12(18500),
-
-      // Gestão / apoio
-      gestao: fill12(6937.58),
-      financeiro: fill12(1968.56),
-      tech: fill12(12793.75),
-      vendas: fill12(2028.45),
-
-      // Serviços terceirizados
-      servicosContabilidade: fill12(18800),
-      servicosAuddas: fill12(8446.5),
+  // WTP (Willingness to Pay) Configuration - Expansion Line Model
+  // IMPORTANTE: Janeiro (índice 0) deve ser 0% para todos os tiers
+  // A expansão só começa a partir de Fevereiro
+  wtpConfig: {
+    enterprise: {
+      annualWTP: 5000000,  // R$ 5.000.000 - WTP anual para Enterprise
+      // Agenda por idade da safra (go-live incluso): 2%,0%,0%,10%,0%,0%,30%,0%,0%,30%,0%,0%,30%
+      shareOfWalletDesired: [0.02, 0, 0, 0.10, 0, 0, 0.30, 0, 0, 0.30, 0, 0, 0.30],
+      expansionTickets: {
+        saber: 70000,
+        ter: 10000,
+        executarNoLoyalty: 10000,
+        executarLoyalty: 100000,
+        potencializar: 0,
+      },
+      productDistribution: {
+        saber: 0.50,
+        ter: 0.40,
+        executarNoLoyalty: 0.05,
+        executarLoyalty: 0.05,
+        potencializar: 0.00,
+      },
     },
-    
-    // Financeiro
-    despesasFinanceirasRate: 0.019,       // 1.9% sobre Receita Bruta Recebida
-    irpjRate: 0.15,                       // 15% sobre EBIT
-    csllRate: 0.09,                       // 9% sobre EBIT
-    
-    // Fluxo de Caixa
-    depreciacao: 8740.71,                 // R$ 8.740,71/mês
-    compraAtivoIntangivel: 4985.21,       // R$ 4.985,21/mês
-    pagamentoFinanciamento: 11388.93,     // R$ 11.388,93/mês
-    distribuicaoDividendos: 150000,       // R$ 150.000/mês
-    caixaInicial: 1500000,                // R$ 1.500.000 (capital inicial)
-    // Manual override: extra ativações Executar No-Loyalty para Tier `medium`
-    // Usuário pode editar mês a mês na planilha (linha visível). Padrão = 0
-    extraExecutarNoLoyaltyMedium: fill12(0),
-    // Receita ano anterior (valor anual em R$) — editável no cabeçalho
-    previousYearRevenue: 34000000,
+    large: {
+      annualWTP: 3000000,  // R$ 3.000.000 - WTP anual para Large
+      // 4%,0%,0%,10%,0%,0%,30%,0%,0%,30%,0%,0%,30%
+      shareOfWalletDesired: [0.04, 0, 0, 0.10, 0, 0, 0.30, 0, 0, 0.30, 0, 0, 0.30],
+      expansionTickets: {
+        saber: 25000,
+        ter: 10000,
+        executarNoLoyalty: 8000,
+        executarLoyalty: 72000,
+        potencializar: 0,
+      },
+      productDistribution: {
+        saber: 0.40,
+        ter: 0.40,
+        executarNoLoyalty: 0.10,
+        executarLoyalty: 0.10,
+        potencializar: 0.00,
+      },
+    },
+    medium: {
+      annualWTP: 1000000,       // WTP anual padrão (Fev+)
+      annualWTPJan: 500000,     // WTP anual para safra que nasce em Jan
+      // Safras nascidas a partir de fev/mar: 6%,0%,32%,17%,15%,10%,10%,7%,5%,4%,0%,0%
+      shareOfWalletDesired: [0.06, 0, 0.32, 0.17, 0.15, 0.10, 0.10, 0.07, 0.05, 0.04, 0, 0],
+      // Agenda específica para safra nascida em janeiro (idade 0 em jan): 11%,0%,32%,17%,15%,10%,10%,7%,5%,4%,0%,0%,0%
+      shareOfWalletDesiredJan: [0.11, 0, 0.32, 0.17, 0.15, 0.10, 0.10, 0.07, 0.05, 0.04, 0, 0, 0],
+      expansionTickets: {
+        saber: 20000,
+        ter: 10000,
+        executarNoLoyalty: 6000,
+        executarLoyalty: 42000,
+        potencializar: 0,
+      },
+      productDistribution: {
+        saber: 0.25,
+        ter: 0.35,
+        executarNoLoyalty: 0.20,
+        executarLoyalty: 0.20,
+        potencializar: 0.00,
+      },
+    },
+    small: {
+      annualWTP: 90000,  // R$ 90.000 - WTP anual para Small
+      // 30%,0%,32%,17%,15%,10%,10%,7%,5%,4%,0%,0%,0%
+      shareOfWalletDesired: [0.30, 0, 0.32, 0.17, 0.15, 0.10, 0.10, 0.07, 0.05, 0.04, 0, 0, 0],
+      expansionTickets: {
+        saber: 8000,
+        ter: 10000,
+        executarNoLoyalty: 0,
+        executarLoyalty: 0,
+        potencializar: 0,
+      },
+      productDistribution: {
+        saber: 0.60,
+        ter: 0.40,
+        executarNoLoyalty: 0.00,
+        executarLoyalty: 0.00,
+        potencializar: 0.00,
+      },
+    },
+    tiny: {
+      annualWTP: 50000,  // R$ 50.000 - WTP anual para Tiny
+      // 40%,0%,32%,17%,15%,10%,10%,7%,5%,4%,0%,0%
+      shareOfWalletDesired: [0.40, 0, 0.32, 0.17, 0.15, 0.10, 0.10, 0.07, 0.05, 0.04, 0, 0],
+      expansionTickets: {
+        saber: 8000,
+        ter: 6000,
+        executarNoLoyalty: 0,
+        executarLoyalty: 0,
+        potencializar: 0,
+      },
+      productDistribution: {
+        saber: 0.60,
+        ter: 0.40,
+        executarNoLoyalty: 0.00,
+        executarLoyalty: 0.00,
+        potencializar: 0.00,
+      },
+    },
   },
 };
 
