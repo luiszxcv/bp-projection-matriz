@@ -86,6 +86,9 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
     capacityHC: false,
   });
 
+  // Estado para expandir a lista de Accounts por Tier dentro do Capacity Plan
+  const [accountsExpanded, setAccountsExpanded] = useState<boolean>(false);
+
   // Estado para filtro do funil por tier
   type FunnelFilter = 'all' | 'tickets' | 'rates' | 'distribution' | 'results';
   const [funnelFilter, setFunnelFilter] = useState<FunnelFilter>('all');
@@ -901,6 +904,67 @@ export function SpreadsheetView({ simulation, onUpdate }: SpreadsheetViewProps) 
                   <SpreadsheetCell
                     value={monthlyData.reduce((sum, m) => sum + TIERS.reduce((s, tier) => s + (m.revenueByTierProduct?.[tier]?.[product] ?? 0), 0), 0)}
                     format="currency"
+                    className="spreadsheet-total"
+                  />
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* CAPACITY PLAN (UI) - Accounts stratification collapsible */}
+          <div className="flex">
+            <div className="spreadsheet-row-header sticky left-0 z-20 bg-card flex items-center justify-between">
+              <button
+                onClick={() => toggleSection('capacityPlan')}
+                className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-primary hover:text-primary/80"
+              >
+                {expandedSections.capacityPlan ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                PLANO DE CAPACIDADE
+              </button>
+            </div>
+            {[...Array(13)].map((_, i) => (
+              <div key={`cap-header-${i}`} className="spreadsheet-cell spreadsheet-total" />
+            ))}
+          </div>
+
+          {expandedSections.capacityPlan && (
+            <>
+              <div className="flex row-hover">
+                <RowHeader label="# Accounts Required" tooltip="Accounts necessários (carteira)" />
+                {monthlyData.map((m, i) => (
+                  <SpreadsheetCell key={i} value={m.capacityPlan.accountsRequired ?? 0} format="number" />
+                ))}
+                <SpreadsheetCell
+                  value={monthlyData.reduce((s, m) => s + (m.capacityPlan.accountsRequired || 0), 0)}
+                  format="number"
+                  className="spreadsheet-total"
+                />
+              </div>
+
+              <div className="flex row-hover">
+                <div className="spreadsheet-row-header sticky left-0 z-20 bg-card flex items-center">
+                  <button
+                    onClick={() => setAccountsExpanded(prev => !prev)}
+                    className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-primary"
+                  >
+                    {accountsExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    Carteira por Tier
+                  </button>
+                </div>
+                {[...Array(13)].map((_, i) => (
+                  <div key={`cap-empty-${i}`} className="spreadsheet-cell" />
+                ))}
+              </div>
+
+              {accountsExpanded && TIERS.map((tier) => (
+                <div key={`accounts-tier-${tier}`} className="flex row-hover">
+                  <RowHeader label={`  ${TIER_LABELS[tier]}`} className="pl-6" level="tier" tier={tier} />
+                  {monthlyData.map((m, i) => (
+                    <SpreadsheetCell key={i} value={m.capacityPlan.accountsByTier?.[tier] ?? 0} format="number" />
+                  ))}
+                  <SpreadsheetCell
+                    value={monthlyData.reduce((s, m) => s + (m.capacityPlan.accountsByTier?.[tier] || 0), 0)}
+                    format="number"
                     className="spreadsheet-total"
                   />
                 </div>
